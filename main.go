@@ -5,12 +5,10 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/sqooba/go-common/logging"
 	"github.com/sqooba/go-common/version"
 	"golang.org/x/sync/errgroup"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -62,23 +60,23 @@ func main() {
 	// errgroup will coordinate the many routines handling the API.
 	cancellableCtx, cancel := context.WithCancel(context.Background())
 	g, ctx := errgroup.WithContext(cancellableCtx)
+	// signalChan will catch the shutdown signal and initiate a clean shutdown
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 
-	r := gin.Default()
-	r.GET("/ping", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "pong",
-		})
-	})
+	// The state where information are stored
+	theState := newState()
 
-	g.Go(func() error {
-		err := r.Run(fmt.Sprintf("%s:%s", env.BindIP, env.Port))
-		if err != nil {
-			log.WithError(err).Errorf("Got an error")
-		}
-		return err
-	})
+	// The fetcher will poll the Volley Manager API at a given rate
+	theFetcher, err := newFetcher(theState)
+	if err != nil {
+		log.WithError(err).Error("Got an error while instantiating the fetcher")
+	}
+	theFetcher.run(env.RefreshInterval, g)
+
+	// The API will server the request with the data from the state
+	theApi := newApi(theState)
+	theApi.run(fmt.Sprintf("%s:%s", env.BindIP, env.Port), g)
 
 	// Wait for any shutdown
 	select {
@@ -92,6 +90,7 @@ func main() {
 		break
 	}
 
+	// if a non-clean shutdown was triggered, details are printed here
 	err = ctx.Err()
 	if err != nil && !errors.Is(err, context.Canceled) {
 		log.Fatalf("Got an error from the error group context: %v", err)
