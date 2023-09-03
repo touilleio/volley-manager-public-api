@@ -1,0 +1,12 @@
+version: "3"
+services:
+  public-api:
+    image: touilleio/volley-manager-public-api:latest
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile
+    expose:
+      - 8080
+    security_opt:
+      - no-new-privileges:true
