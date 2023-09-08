@@ -5,6 +5,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"net/http"
+	"strconv"
 )
 
 type api struct {
@@ -19,10 +20,34 @@ func newApi(state *state) *api {
 }
 
 func (a *api) upcoming(c *gin.Context) {
-
+	games := a.state.rawGames
+	c.JSON(http.StatusOK, games)
 }
-func (a *api) ranking(c *gin.Context) {
 
+func (a *api) teamUpcoming(c *gin.Context) {
+	a.state.lock.RLock()
+	defer a.state.lock.RUnlock()
+	teamIdStr := c.Param("teamid")
+	teamId, err := strconv.Atoi(teamIdStr)
+	if err != nil {
+		c.String(http.StatusBadRequest, "Invalid teamId %s, err = %s", teamIdStr, err.Error())
+		return
+	}
+	games := a.state.gamesPerTeam[teamId]
+	c.JSON(http.StatusOK, games)
+}
+
+func (a *api) teamRanking(c *gin.Context) {
+	a.state.lock.RLock()
+	defer a.state.lock.RUnlock()
+	teamIdStr := c.Param("teamid")
+	teamId, err := strconv.Atoi(teamIdStr)
+	if err != nil {
+		c.String(http.StatusBadRequest, "Invalid teamId %s, err = %s", teamIdStr, err.Error())
+		return
+	}
+	rankings := a.state.rankingPerTeam[teamId]
+	c.JSON(http.StatusOK, rankings.Ranking)
 }
 
 func (a api) run(address string, g *errgroup.Group) {
@@ -34,7 +59,8 @@ func (a api) run(address string, g *errgroup.Group) {
 		})
 	})
 	r.GET("/upcoming", a.upcoming)
-	r.GET("/ranking", a.ranking)
+	r.GET("/upcoming/:teamid", a.teamUpcoming)
+	r.GET("/ranking/:teamid", a.teamRanking)
 
 	g.Go(func() error {
 		err := r.Run(address)
