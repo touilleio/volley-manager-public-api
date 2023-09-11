@@ -1,7 +1,7 @@
 version: "3"
 services:
   public-api:
-    image: touilleio/volley-manager-public-api:latest
+    image: touilleio/volley-manager-public-api:v1.0.0
     restart: unless-stopped
     build:
       context: .

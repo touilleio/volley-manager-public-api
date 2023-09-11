@@ -46,17 +46,13 @@ type Game struct {
 		Home Team `json:"home"`
 		Away Team `json:"away"`
 	} `json:"teams"`
-	League        League     `json:"league"`
-	Phase         Phase      `json:"phase"`
-	Group         Group      `json:"group"`
-	Hall          Hall       `json:"hall"`
-	Referees      Referees   `json:"referees"`
-	SetResults    SetResults `json:"setResults"`
-	ResultSummary []struct {
-		WonSetsHomeTeam int    `json:"wonSetsHomeTeam"`
-		WonSetsAwayTeam int    `json:"wonSetsAwayTeam"`
-		Winner          string `json:"winner"`
-	} `json:"resultSummary"`
+	League        League          `json:"league"`
+	Phase         Phase           `json:"phase"`
+	Group         Group           `json:"group"`
+	Hall          Hall            `json:"hall"`
+	Referees      Referees        `json:"referees"`
+	SetResults    SetResults      `json:"setResults"`
+	ResultSummary ResultSummaries `json:"resultSummary"`
 }
 
 type Team struct {
@@ -141,10 +137,28 @@ func (r *Referees) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type ResultSummaries struct {
+	Data ResultSummary
+}
+
+func (r *ResultSummaries) UnmarshalJSON(data []byte) error {
+	var resultSummary ResultSummary
+	if err := json.Unmarshal(data, &resultSummary); err == nil {
+		r.Data = resultSummary
+	}
+	return nil
+}
+
 type Referee struct {
 	RefereeId int    `json:"refereeId"`
 	LastName  string `json:"lastName"`
 	FirstName string `json:"firstName"`
+}
+
+type ResultSummary struct {
+	WonSetsHomeTeam int    `json:"wonSetsHomeTeam"`
+	WonSetsAwayTeam int    `json:"wonSetsAwayTeam"`
+	Winner          string `json:"winner"`
 }
 
 type GroupRankings struct {
@@ -156,7 +170,7 @@ type GroupRankings struct {
 
 type TeamRanking struct {
 	Rank          int    `json:"rank"`
-	TeamId        int    `json:"teamId"`
+	TeamId        int    `json:"teamId,omitempty"`
 	TeamCaption   string `json:"teamCaption"`
 	Games         int    `json:"rawGames"`
 	Points        int    `json:"points"`

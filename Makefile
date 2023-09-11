@@ -46,4 +46,4 @@ test:
 	$(GOTEST) ./...
 
 release:
-	docker push ${DOCKER_REGISTRY}${GO_PACKAGE_PREFIX}:$(VERSION_MAJOR) && \
+	docker push ${DOCKER_REGISTRY}${GO_PACKAGE_PREFIX}:$(VERSION)

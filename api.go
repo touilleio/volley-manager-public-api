@@ -71,3 +71,29 @@ func (a api) run(address string, g *errgroup.Group) {
 		return err
 	})
 }
+
+func toGamePublic(game Game) GamePublic {
+	gp := GamePublic{
+		PlayDate: game.PlayDate,
+		HomeTeam: game.Teams.Home.Caption,
+		AwayTeam: game.Teams.Away.Caption,
+		League:   game.League.Caption,
+		Hall:     game.Hall.Caption,
+	}
+	if game.ResultSummary.Data.Winner != "" {
+		gp.Winner = game.ResultSummary.Data.Winner
+		gp.WonSetsAwayTeam = game.ResultSummary.Data.WonSetsAwayTeam
+		gp.WonSetsHomeTeam = game.ResultSummary.Data.WonSetsHomeTeam
+	}
+}
+
+type GamePublic struct {
+	PlayDate        string `json:"playDate"`
+	HomeTeam        string `json:"homeTeam"`
+	AwayTeam        string `json:"awayTeam"`
+	League          string `json:"phase"`
+	Hall            string `json:"hall"`
+	WonSetsHomeTeam int    `json:"wonSetsHomeTeam"`
+	WonSetsAwayTeam int    `json:"wonSetsAwayTeam"`
+	Winner          string `json:"winner"`
+}
