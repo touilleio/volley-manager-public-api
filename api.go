@@ -6,6 +6,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 type api struct {
@@ -19,9 +20,11 @@ func newApi(state *state) *api {
 	return &api
 }
 
+const timeFormat = "2006-01-02 15:04:05"
+
 func (a *api) upcoming(c *gin.Context) {
-	games := a.state.rawGames
-	c.JSON(http.StatusOK, games)
+	gamesPublic := toUpcomingGamesPublic(a.state.rawGames)
+	c.JSON(http.StatusOK, gamesPublic)
 }
 
 func (a *api) teamUpcoming(c *gin.Context) {
@@ -33,8 +36,8 @@ func (a *api) teamUpcoming(c *gin.Context) {
 		c.String(http.StatusBadRequest, "Invalid teamId %s, err = %s", teamIdStr, err.Error())
 		return
 	}
-	games := a.state.gamesPerTeam[teamId]
-	c.JSON(http.StatusOK, games)
+	gamesPublic := toUpcomingGamesPublic(a.state.gamesPerTeam[teamId])
+	c.JSON(http.StatusOK, gamesPublic)
 }
 
 func (a *api) teamRanking(c *gin.Context) {
@@ -85,6 +88,23 @@ func toGamePublic(game Game) GamePublic {
 		gp.WonSetsAwayTeam = game.ResultSummary.Data.WonSetsAwayTeam
 		gp.WonSetsHomeTeam = game.ResultSummary.Data.WonSetsHomeTeam
 	}
+	return gp
+}
+
+func toUpcomingGamesPublic(games []Game) []GamePublic {
+	gamesPublic := make([]GamePublic, 0, len(games))
+	for _, g := range games {
+		parsedTime, err := time.Parse(timeFormat, g.PlayDate)
+		if err != nil {
+			// TODO log a warning
+			continue
+		}
+		now := time.Now()
+		if parsedTime.After(now) {
+			gamesPublic = append(gamesPublic, toGamePublic(g))
+		}
+	}
+	return gamesPublic
 }
 
 type GamePublic struct {

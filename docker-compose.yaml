@@ -6,7 +6,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    expose:
+    environment:
+      - API_KEY
+    ports:
       - 8080
     security_opt:
       - no-new-privileges:true
