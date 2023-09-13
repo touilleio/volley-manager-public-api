@@ -9,38 +9,20 @@ $( document ).ready(function() {
 		},	
 		order: [[0, "desc"]],
 		ajax: {
-			'url': '/upcoming',
+			'url': '/ranking/6636',
             'dataSrc': ''
         },
 		columns: [
 			{
-				data: 'playDate',
-				render: function(data) {
-					return data
-					var d = new Date(data);
-					var datestring = d.getDate().toString().padStart(2, "0") + "." + (d.getMonth()+1).toString().padStart(2, "0") + "." + d.getFullYear() + " " + d.getHours().toString().padStart(2, "0") + ":" + d.getMinutes().toString().padStart(2, "0");
-					return datestring;
-				}
+				data: 'teamCaption'
 			},{
-				data: 'teams',
-				render: function(data) {
-					return data.home.caption
-				}
+				data: 'rawGames'
 			},{
-				data: 'teams',
-				render: function(data) {
-					return data.away.caption
-				}
+				data: 'wins'
 			},{
-				data: 'phase',
-				render: function(data) {
-					return data.caption
-				}
+				data: 'defeats'
 			},{
-				data: 'hall',
-				render: function(data) {
-					return data.caption + ", " +" "+data.city
-				}
+				data: 'points'
 			}
 		],
 		dom: 'Bfrtip',
@@ -51,7 +33,7 @@ $( document ).ready(function() {
 			
 			for (var ele in json) {
 				//entry=json[ele].teams.home.teamId
-				t = json[ele].teams.home.caption + ":" + json[ele].teams.home.teamId
+				t = json[ele].teamCaption + ":" + json[ele].teamId
 				if(!teams.includes(t) && t.includes("Gibloux")){
 					teams.push(t)
 				}
