@@ -22,12 +22,12 @@ func newApi(state *state) *api {
 
 const timeFormat = "2006-01-02 15:04:05"
 
-func (a *api) upcoming(c *gin.Context) {
+func (a *api) upcomingGames(c *gin.Context) {
 	gamesPublic := toUpcomingGamesPublic(a.state.rawGames)
 	c.JSON(http.StatusOK, gamesPublic)
 }
 
-func (a *api) teamUpcoming(c *gin.Context) {
+func (a *api) teamUpcomingGames(c *gin.Context) {
 	a.state.lock.RLock()
 	defer a.state.lock.RUnlock()
 	teamIdStr := c.Param("teamid")
@@ -37,6 +37,24 @@ func (a *api) teamUpcoming(c *gin.Context) {
 		return
 	}
 	gamesPublic := toUpcomingGamesPublic(a.state.gamesPerTeam[teamId])
+	c.JSON(http.StatusOK, gamesPublic)
+}
+
+func (a *api) pastGames(c *gin.Context) {
+	gamesPublic := toUpcomingGamesPublic(a.state.rawGames)
+	c.JSON(http.StatusOK, gamesPublic)
+}
+
+func (a *api) teamPastGames(c *gin.Context) {
+	a.state.lock.RLock()
+	defer a.state.lock.RUnlock()
+	teamIdStr := c.Param("teamid")
+	teamId, err := strconv.Atoi(teamIdStr)
+	if err != nil {
+		c.String(http.StatusBadRequest, "Invalid teamId %s, err = %s", teamIdStr, err.Error())
+		return
+	}
+	gamesPublic := toPastGamesPublic(a.state.gamesPerTeam[teamId])
 	c.JSON(http.StatusOK, gamesPublic)
 }
 
@@ -53,6 +71,16 @@ func (a *api) teamRanking(c *gin.Context) {
 	c.JSON(http.StatusOK, rankings.Ranking)
 }
 
+func (a *api) teams(c *gin.Context) {
+	a.state.lock.RLock()
+	defer a.state.lock.RUnlock()
+	teams := make(map[int]string, len(a.state.teams))
+	for k, v := range a.state.teams {
+		teams[k] = v.Caption
+	}
+	c.JSON(http.StatusOK, teams)
+}
+
 func (a api) run(address string, g *errgroup.Group) {
 
 	r := gin.Default()
@@ -62,9 +90,12 @@ func (a api) run(address string, g *errgroup.Group) {
 			"message": "pong",
 		})
 	})
-	r.GET("/upcoming", a.upcoming)
-	r.GET("/upcoming/:teamid", a.teamUpcoming)
+	r.GET("/upcoming", a.upcomingGames)
+	r.GET("/upcoming/:teamid", a.teamUpcomingGames)
+	r.GET("/past", a.pastGames)
+	r.GET("/past/:teamid", a.teamPastGames)
 	r.GET("/ranking/:teamid", a.teamRanking)
+	r.GET("/teams", a.teams)
 
 	g.Go(func() error {
 		err := r.Run(address)
@@ -101,6 +132,22 @@ func toUpcomingGamesPublic(games []Game) []GamePublic {
 		}
 		now := time.Now()
 		if parsedTime.After(now) {
+			gamesPublic = append(gamesPublic, toGamePublic(g))
+		}
+	}
+	return gamesPublic
+}
+
+func toPastGamesPublic(games []Game) []GamePublic {
+	gamesPublic := make([]GamePublic, 0, len(games))
+	for _, g := range games {
+		parsedTime, err := time.Parse(timeFormat, g.PlayDate)
+		if err != nil {
+			// TODO log a warning
+			continue
+		}
+		now := time.Now()
+		if now.After(parsedTime) {
 			gamesPublic = append(gamesPublic, toGamePublic(g))
 		}
 	}
