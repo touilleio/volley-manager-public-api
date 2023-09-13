@@ -25,3 +25,9 @@ All the sources are provided in this repo, if you're adventurous you can build i
 ```shell
 docker compose build
 ```
+
+## Use it
+
+Open your browser at:
+
+http://localhost:8080/static/index.html
