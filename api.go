@@ -53,6 +53,7 @@ func (a *api) teamRanking(c *gin.Context) {
 func (a api) run(address string, g *errgroup.Group) {
 
 	r := gin.Default()
+	r.StaticFS("/static", http.Dir("/static"))
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "pong",
