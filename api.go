@@ -41,7 +41,7 @@ func (a *api) teamUpcomingGames(c *gin.Context) {
 }
 
 func (a *api) pastGames(c *gin.Context) {
-	gamesPublic := toUpcomingGamesPublic(a.state.rawGames)
+	gamesPublic := toPastGamesPublic(a.state.rawGames)
 	c.JSON(http.StatusOK, gamesPublic)
 }
 

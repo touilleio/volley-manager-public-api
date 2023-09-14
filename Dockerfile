@@ -24,6 +24,7 @@ RUN env GOOS=${TARGETOS} GOARCH=${TARGETARCH} CGO_ENABLED=0 \
 
 FROM --platform=$BUILDPLATFORM alpine:3.18
 COPY --from=builder /src/volley-manager-public-api .
+COPY ./static /static
 
 USER nobody
 
