@@ -16,13 +16,6 @@ $( document ).ready(function() {
 			{
 				data: 'playDate',
 				render: DataTable.render.datetime('DD.MM.YYYY HH:mm')
-				/*
-				render: function(data) {
-					var d = new Date(data);
-					var datestring = d.getDate().toString().padStart(2, "0") + "." + (d.getMonth()+1).toString().padStart(2, "0") + "." + d.getFullYear() + " " + d.getHours().toString().padStart(2, "0") + ":" + d.getMinutes().toString().padStart(2, "0");
-					return datestring;
-				}
-				*/
 			},{
 				data: 'winner',
 				render: function(data, param, row) {

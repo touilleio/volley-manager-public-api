@@ -1,26 +1,5 @@
 var oTable;
 
-/*
-"rank": 2,
-"teamId": 7896,
-"teamCaption": "VBC Sense F2",
-"rawGames": 0,
-"points": 0,
-"wins": 0,
-"winsClear": 0,
-"winsNarrow": 0,
-"defeats": 0,
-"defeatsClear": 0,
-"defeatsNarrow": 0,
-"setsWon": 0,
-"setsLost": 0,
-"ballsWon": 0,
-"ballsLost": 0,
-"isTeam": false
-*/
-
-
-
 $( document ).ready(function() {
 	
 	teams = []
