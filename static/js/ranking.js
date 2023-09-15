@@ -38,13 +38,15 @@ $( document ).ready(function() {
 					language: {
 						url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/fr-FR.json',
 					},	
-					order: [[0, "desc"]],
+					order: [[0, "asc"]],
 					ajax: {
 						'url': '/ranking/'+value,
 						'dataSrc': ''
 					},
 					columns: [
 						{
+							data: 'rank'
+						},{
 							data: 'teamCaption'
 						},{
 							data: 'rawGames'
