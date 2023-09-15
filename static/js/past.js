@@ -9,7 +9,7 @@ $( document ).ready(function() {
 		},	
 		order: [[0, "desc"]],
 		ajax: {
-			'url': '/upcoming',
+			'url': '/past',
             'dataSrc': ''
         },
 		columns: [
@@ -23,6 +23,24 @@ $( document ).ready(function() {
 					return datestring;
 				}
 				*/
+			},{
+				data: 'winner',
+				render: function(data, param, row) {
+					if(data == 'team_away'){
+						return row.awayTeam
+					}else if(data == 'team_home'){
+						return row.homeTeam
+					}
+				}
+			},{
+				data: 'wonSetsHomeTeam',
+				render: function(data, param, row) {
+					if(row.winner=='team_away'){
+						return row.wonSetsAwayTeam + " à " + row.wonSetsHomeTeam
+					}else{
+						return row.wonSetsHomeTeam + " à " + row.wonSetsAwayTeam
+					}
+				}
 			},{
 				data: 'homeTeam'
 			},{
@@ -59,9 +77,9 @@ $( document ).ready(function() {
 				$('#sel_team_id').on('change', function () {
 					val = $(this).find(":selected").text()
 					if(val == "Toutes")
-						oTable.columns(2).search("").draw();
+						oTable.columns(4).search("").draw();
 					else
-						oTable.columns(2).search(val).draw();
+						oTable.columns(4).search(val).draw();
 				});
 			});
 		}
