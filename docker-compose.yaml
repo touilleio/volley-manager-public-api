@@ -9,12 +9,8 @@ services:
     environment:
       - API_KEY
     ports:
-      - 8080
+      - 8080:8080
     security_opt:
       - no-new-privileges:true
     volumes:
       - ./static:/static
-    ports:
-      - 8080:8080
-    environment:
-      - API_KEY
