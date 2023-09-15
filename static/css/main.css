@@ -91,14 +91,6 @@ legend {
     display: none
 }
 
-.demo-html {
-	visibility: hidden;
-}
-
-.demo-html-visible {
-	visibility: visible;
-}
-
 .grid,.unit {
     -webkit-box-sizing: border-box;
     -moz-box-sizing: border-box;
