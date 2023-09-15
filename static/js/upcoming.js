@@ -10,7 +10,7 @@ $( document ).ready(function() {
 		});
 		
 		teams.sort();
-		teams.unshift("Choisis une équipe...")
+		teams.unshift("Toutes:")
 		
 		// select filter
 		$('#team-filter').append('<label>&nbsp; Equipe:</label>');
@@ -20,57 +20,42 @@ $( document ).ready(function() {
 			var obj = teams[ele].split(":");
 			$('#sel_team_id').append('<option value="' + obj[1] + '">' + obj[0] + '</option>');
 		}
+		
+		//console.log( "ready!" );
+		oTable = new DataTable('#example', {
+			pageLength: 15,
+			language: {
+				url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/fr-FR.json',
+			},	
+			order: [[0, "asc"]],
+			ajax: {
+				'url': '/upcoming',
+				'dataSrc': ''
+			},
+			columns: [
+				{
+					data: 'playDate',
+					render: DataTable.render.datetime('DD.MM.YYYY HH:mm')
+				},{
+					data: 'homeTeam'
+				},{
+					data: 'awayTeam'
+				},{
+					data: 'phase'
+				},{
+					data: 'hall'
+				}
+			],
+			dom: 'Bfrtip',
+			select: false
+		});
+		
 		// Filter results on select change
 		$('#sel_team_id').on('change', function () {
 			caption = $(this).find(":selected").text()
 			value = $(this).find(":selected").val()
-			if(!caption.includes("Choisis")){
-				
-				if(oTable != null){
-					oTable.destroy();
-				}else{
-					$("#table-container").toggleClass("demo-html-visible");
-				}
-				
-				//console.log( "ready!" );
-				oTable = new DataTable('#example', {
-					pageLength: 15,
-					language: {
-						url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/fr-FR.json',
-					},	
-					order: [[0, "asc"]],
-					ajax: {
-						'url': '/upcoming/'+value,
-						'dataSrc': ''
-					},
-					columns: [
-						{
-							data: 'playDate',
-							render: DataTable.render.datetime('DD.MM.YYYY HH:mm')
-						},{
-							data: 'homeTeam'
-						},{
-							data: 'awayTeam'
-						},{
-							data: 'phase'
-						},{
-							data: 'hall'
-						}
-					],
-					dom: 'Bfrtip',
-					select: true,
-					initComplete: function () {
-					
-					  this.api().rows().every( function ( rowIdx, tableLoop, rowLoop ) {
-						var data = this.data();
-						
-						if (data.teamCaption === caption) {
-						  this.select();
-						}
-					  });
-					}
-				});
-			}
+			oTable.ajax.url('/upcoming/' + value).load();
+            oTable.draw();
 		});
 	});
 	  
