@@ -38,6 +38,19 @@ $( document ).ready(function() {
 					data: 'playDate',
 					render: DataTable.render.datetime('DD.MM.YYYY HH:mm')
 				},{
+					data: 'homeTeam'
+				},{
+					data: 'awayTeam'
+				},{
+					data: 'phase'
+				},{
+					data: 'hall'
+				},{
+					data: 'wonSetsHomeTeam',
+					render: function(data, param, row) {
+						return row.wonSetsHomeTeam + " / " + row.wonSetsAwayTeam
+					}
+				},{
 					data: 'winner',
 					render: function(data, param, row) {
 						if(data == 'team_away'){
@@ -46,23 +59,6 @@ $( document ).ready(function() {
 							return row.homeTeam
 						}
 					}
-				},{
-					data: 'wonSetsHomeTeam',
-					render: function(data, param, row) {
-						if(row.winner=='team_away'){
-							return row.wonSetsAwayTeam + " à " + row.wonSetsHomeTeam
-						}else{
-							return row.wonSetsHomeTeam + " à " + row.wonSetsAwayTeam
-						}
-					}
-				},{
-					data: 'homeTeam'
-				},{
-					data: 'awayTeam'
-				},{
-					data: 'phase'
-				},{
-					data: 'hall'
 				}
 			],
 			dom: 'Bfrtip',
