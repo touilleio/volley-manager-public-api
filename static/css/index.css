@@ -39,7 +39,7 @@
 }
 
 .title {
-  font-size: 2rem;
+  font-size: 3rem;
   font-weight: 700;
   line-height: 1.25;
   margin-bottom: 4rem;
@@ -52,18 +52,22 @@
   background-color: lightblue;
   border-radius: 4px;
   display: inline-flex;
-  font-size: 18px;
+  font-size: 40px;
   font-weight: 700;
   line-height: 1.25;
   margin-bottom: 2rem;
   padding: 1rem 1.5rem;
-  width:200px;
+  width:100%;
   
   
   & .feather-fixed-w, .feather-fixed-h, .feather-fixed-wh {
     color: rgba(0, 0, 0, .80);
     padding-left: 1rem;
   }
+}
+
+a {
+	width:80%;
 }
 
 label {

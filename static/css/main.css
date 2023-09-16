@@ -91,6 +91,8 @@ legend {
     display: none
 }
 
+div.container { max-width: 1200px }
+
 .grid,.unit {
     -webkit-box-sizing: border-box;
     -moz-box-sizing: border-box;
@@ -1807,9 +1809,8 @@ div.fw-container div.fw-body div.content>h1 {
     left: 0;
     width: 100%;
     margin: 0;
-    font-family: "HelveticaNeue-UltraLight","Helvetica Neue UltraLight","ralewaythin","Helvetica Neue","Calibri Light","Calibri",Helvetica,Arial,sans-serif;
+    font-family: "HelveticaNeue","Helvetica Neue","Helvetica Neue","Calibri Light","Calibri",Helvetica,Arial,sans-serif;
     font-weight: 100;
-    letter-spacing: 1px;
     font-size: 3em;
     line-height: 1.2em;
     white-space: nowrap;
