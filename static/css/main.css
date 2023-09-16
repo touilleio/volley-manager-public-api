@@ -33,8 +33,8 @@ table {
 	padding-top:30px;
 }
 
-#team-filter label{
-	font-size: larger;
+#team-filter label, #example_filter label{
+	font-size: medium;
 }
 
 fieldset,img {
@@ -1804,14 +1804,12 @@ div.fw-container div.fw-body div.content {
 }
 
 div.fw-container div.fw-body div.content>h1 {
-    position: absolute;
     top: -1.15em;
     left: 0;
     width: 100%;
     margin: 0;
-    font-family: "HelveticaNeue","Helvetica Neue","Helvetica Neue","Calibri Light","Calibri",Helvetica,Arial,sans-serif;
-    font-weight: 100;
-    font-size: 3em;
+    font-weight: bold;
+    font-size: 2em;
     line-height: 1.2em;
     white-space: nowrap;
     overflow: hidden;
