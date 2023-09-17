@@ -768,6 +768,10 @@ div.container { max-width: 1200px }
     outline: none
 }
 
+#ics_export {
+	padding-left: 10px;
+}
+
 #lbCaption,#lbNumber {
     margin-right: 71px
 }

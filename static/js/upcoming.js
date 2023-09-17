@@ -1,5 +1,10 @@
 var oTable;
 
+function dwnlCal(){
+	alert("download cal")
+}
+
+
 $( document ).ready(function() {
 	
 	teams = []
@@ -55,6 +60,10 @@ $( document ).ready(function() {
 		$('#sel_team_id').on('change', function () {
 			caption = $(this).find(":selected").text()
 			value = $(this).find(":selected").val()
+			$('#ics_export').remove()
+			if(caption != 'Toutes'){
+				$('#team-filter').append('<a id="ics_export" href="/ics/upcoming/'+$('#sel_team_id').find(":selected").val()+'" target"_blank">Exporter calendrier</a>');
+			}
 			oTable.ajax.url('/upcoming/' + value).load();
             oTable.draw();
 		});
