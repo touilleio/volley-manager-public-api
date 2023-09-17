@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	ics "github.com/arran4/golang-ical"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -38,6 +40,21 @@ func (a *api) teamUpcomingGames(c *gin.Context) {
 	}
 	gamesPublic := toUpcomingGamesPublic(a.state.gamesPerTeam[teamId])
 	c.JSON(http.StatusOK, gamesPublic)
+}
+
+func (a *api) teamUpcomingGamesICS(c *gin.Context) {
+	a.state.lock.RLock()
+	defer a.state.lock.RUnlock()
+	teamIdStr := c.Param("teamid")
+	teamId, err := strconv.Atoi(teamIdStr)
+	if err != nil {
+		c.String(http.StatusBadRequest, "Invalid teamId %s, err = %s", teamIdStr, err.Error())
+		return
+	}
+	upcomingGames := getUpcomingGames(a.state.gamesPerTeam[teamId])
+	icsEncoded := toIcal(upcomingGames)
+
+	c.Data(http.StatusOK, "text/calendar", []byte(icsEncoded))
 }
 
 func (a *api) pastGames(c *gin.Context) {
@@ -92,6 +109,7 @@ func (a api) run(address string, g *errgroup.Group) {
 	})
 	r.GET("/upcoming", a.upcomingGames)
 	r.GET("/upcoming/:teamid", a.teamUpcomingGames)
+	r.GET("/ics/upcoming/:teamid", a.teamUpcomingGamesICS)
 	r.GET("/past", a.pastGames)
 	r.GET("/past/:teamid", a.teamPastGames)
 	r.GET("/ranking/:teamid", a.teamRanking)
@@ -122,8 +140,8 @@ func toGamePublic(game Game) GamePublic {
 	return gp
 }
 
-func toUpcomingGamesPublic(games []Game) []GamePublic {
-	gamesPublic := make([]GamePublic, 0, len(games))
+func getUpcomingGames(games []Game) []Game {
+	upcomingGames := make([]Game, 0, len(games))
 	for _, g := range games {
 		parsedTime, err := time.Parse(timeFormat, g.PlayDate)
 		if err != nil {
@@ -132,14 +150,14 @@ func toUpcomingGamesPublic(games []Game) []GamePublic {
 		}
 		now := time.Now()
 		if parsedTime.After(now) {
-			gamesPublic = append(gamesPublic, toGamePublic(g))
+			upcomingGames = append(upcomingGames, g)
 		}
 	}
-	return gamesPublic
+	return upcomingGames
 }
 
-func toPastGamesPublic(games []Game) []GamePublic {
-	gamesPublic := make([]GamePublic, 0, len(games))
+func getPastGames(games []Game) []Game {
+	upcomingGames := make([]Game, 0, len(games))
 	for _, g := range games {
 		parsedTime, err := time.Parse(timeFormat, g.PlayDate)
 		if err != nil {
@@ -148,8 +166,24 @@ func toPastGamesPublic(games []Game) []GamePublic {
 		}
 		now := time.Now()
 		if now.After(parsedTime) {
-			gamesPublic = append(gamesPublic, toGamePublic(g))
+			upcomingGames = append(upcomingGames, g)
 		}
+	}
+	return upcomingGames
+}
+
+func toUpcomingGamesPublic(games []Game) []GamePublic {
+	gamesPublic := make([]GamePublic, 0, len(games))
+	for _, g := range getUpcomingGames(games) {
+		gamesPublic = append(gamesPublic, toGamePublic(g))
+	}
+	return gamesPublic
+}
+
+func toPastGamesPublic(games []Game) []GamePublic {
+	gamesPublic := make([]GamePublic, 0, len(games))
+	for _, g := range getPastGames(games) {
+		gamesPublic = append(gamesPublic, toGamePublic(g))
 	}
 	return gamesPublic
 }
@@ -163,4 +197,35 @@ type GamePublic struct {
 	WonSetsHomeTeam int    `json:"wonSetsHomeTeam"`
 	WonSetsAwayTeam int    `json:"wonSetsAwayTeam"`
 	Winner          string `json:"winner"`
+}
+
+func toIcal(games []Game) string {
+
+	cal := ics.NewCalendar()
+	cal.SetMethod(ics.MethodRequest)
+	//cal.SetTimezoneId("Europe/Zurich")
+	location, err := time.LoadLocation("Europe/Zurich")
+	if err != nil {
+		panic(err)
+	}
+
+	for _, game := range games {
+		event := cal.AddEvent(fmt.Sprintf("sv-%d", game.GameId))
+
+		parsedTime, err := time.ParseInLocation(timeFormat, game.PlayDate, location)
+		if err != nil {
+			// TODO log a warning
+			continue
+		}
+		event.SetCreatedTime(time.Now())
+		event.SetClass(ics.ClassificationPublic)
+		event.SetDtStampTime(parsedTime)
+		event.SetModifiedAt(time.Now())
+		event.SetStartAt(parsedTime)
+		event.SetEndAt(parsedTime.Add(2 * time.Hour))
+		event.SetSummary(fmt.Sprintf("Match %s vs %s", game.Teams.Home.Caption, game.Teams.Away.Caption))
+		event.SetLocation(fmt.Sprintf("%s, %s", game.Hall.Caption, game.Hall.City))
+		event.SetDescription(fmt.Sprintf("Match %s, %s vs %s, %s @ %s %s", game.League.Caption, game.Teams.Home.Caption, game.Teams.Away.Caption, parsedTime, game.Hall.Caption, game.Hall.City))
+	}
+	return cal.Serialize()
 }

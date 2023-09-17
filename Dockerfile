@@ -26,6 +26,8 @@ FROM --platform=$BUILDPLATFORM alpine:3.18
 COPY --from=builder /src/volley-manager-public-api .
 COPY ./static /static
 
+RUN apk add --no-cache tzdata
+
 USER nobody
 
 ENTRYPOINT ["/volley-manager-public-api"]
