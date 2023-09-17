@@ -12,20 +12,31 @@ import (
 )
 
 type api struct {
-	state *state
+	state    *state
+	location *time.Location
 }
 
 func newApi(state *state) *api {
+
+	location, err := time.LoadLocation(timezone)
+	if err != nil {
+		panic(err)
+	}
+
 	api := api{
-		state: state,
+		state:    state,
+		location: location,
 	}
 	return &api
 }
 
-const timeFormat = "2006-01-02 15:04:05"
+const (
+	timeFormat = "2006-01-02 15:04:05"
+	timezone   = "Europe/Zurich"
+)
 
 func (a *api) upcomingGames(c *gin.Context) {
-	gamesPublic := toUpcomingGamesPublic(a.state.rawGames)
+	gamesPublic := toUpcomingGamesPublic(a.state.rawGames, a.location)
 	c.JSON(http.StatusOK, gamesPublic)
 }
 
@@ -38,7 +49,7 @@ func (a *api) teamUpcomingGames(c *gin.Context) {
 		c.String(http.StatusBadRequest, "Invalid teamId %s, err = %s", teamIdStr, err.Error())
 		return
 	}
-	gamesPublic := toUpcomingGamesPublic(a.state.gamesPerTeam[teamId])
+	gamesPublic := toUpcomingGamesPublic(a.state.gamesPerTeam[teamId], a.location)
 	c.JSON(http.StatusOK, gamesPublic)
 }
 
@@ -51,14 +62,17 @@ func (a *api) teamUpcomingGamesICS(c *gin.Context) {
 		c.String(http.StatusBadRequest, "Invalid teamId %s, err = %s", teamIdStr, err.Error())
 		return
 	}
-	upcomingGames := getUpcomingGames(a.state.gamesPerTeam[teamId])
-	icsEncoded := toIcal(upcomingGames)
+	upcomingGames := getUpcomingGames(a.state.gamesPerTeam[teamId], a.location)
+	icsEncoded := toIcal(upcomingGames, a.location)
 
+	if team, ok := a.state.teams[teamId]; ok {
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", team.Caption))
+	}
 	c.Data(http.StatusOK, "text/calendar", []byte(icsEncoded))
 }
 
 func (a *api) pastGames(c *gin.Context) {
-	gamesPublic := toPastGamesPublic(a.state.rawGames)
+	gamesPublic := toPastGamesPublic(a.state.rawGames, a.location)
 	c.JSON(http.StatusOK, gamesPublic)
 }
 
@@ -71,7 +85,7 @@ func (a *api) teamPastGames(c *gin.Context) {
 		c.String(http.StatusBadRequest, "Invalid teamId %s, err = %s", teamIdStr, err.Error())
 		return
 	}
-	gamesPublic := toPastGamesPublic(a.state.gamesPerTeam[teamId])
+	gamesPublic := toPastGamesPublic(a.state.gamesPerTeam[teamId], a.location)
 	c.JSON(http.StatusOK, gamesPublic)
 }
 
@@ -130,7 +144,7 @@ func toGamePublic(game Game) GamePublic {
 		HomeTeam: game.Teams.Home.Caption,
 		AwayTeam: game.Teams.Away.Caption,
 		League:   game.League.Caption,
-		Hall:     game.Hall.Caption,
+		Hall:     fmt.Sprintf("%s, %s", game.Hall.Caption, game.Hall.City),
 	}
 	if game.ResultSummary.Data.Winner != "" {
 		gp.Winner = game.ResultSummary.Data.Winner
@@ -140,10 +154,10 @@ func toGamePublic(game Game) GamePublic {
 	return gp
 }
 
-func getUpcomingGames(games []Game) []Game {
+func getUpcomingGames(games []Game, location *time.Location) []Game {
 	upcomingGames := make([]Game, 0, len(games))
 	for _, g := range games {
-		parsedTime, err := time.Parse(timeFormat, g.PlayDate)
+		parsedTime, err := time.ParseInLocation(timeFormat, g.PlayDate, location)
 		if err != nil {
 			// TODO log a warning
 			continue
@@ -156,10 +170,10 @@ func getUpcomingGames(games []Game) []Game {
 	return upcomingGames
 }
 
-func getPastGames(games []Game) []Game {
+func getPastGames(games []Game, location *time.Location) []Game {
 	upcomingGames := make([]Game, 0, len(games))
 	for _, g := range games {
-		parsedTime, err := time.Parse(timeFormat, g.PlayDate)
+		parsedTime, err := time.ParseInLocation(timeFormat, g.PlayDate, location)
 		if err != nil {
 			// TODO log a warning
 			continue
@@ -172,17 +186,17 @@ func getPastGames(games []Game) []Game {
 	return upcomingGames
 }
 
-func toUpcomingGamesPublic(games []Game) []GamePublic {
+func toUpcomingGamesPublic(games []Game, location *time.Location) []GamePublic {
 	gamesPublic := make([]GamePublic, 0, len(games))
-	for _, g := range getUpcomingGames(games) {
+	for _, g := range getUpcomingGames(games, location) {
 		gamesPublic = append(gamesPublic, toGamePublic(g))
 	}
 	return gamesPublic
 }
 
-func toPastGamesPublic(games []Game) []GamePublic {
+func toPastGamesPublic(games []Game, location *time.Location) []GamePublic {
 	gamesPublic := make([]GamePublic, 0, len(games))
-	for _, g := range getPastGames(games) {
+	for _, g := range getPastGames(games, location) {
 		gamesPublic = append(gamesPublic, toGamePublic(g))
 	}
 	return gamesPublic
@@ -199,15 +213,10 @@ type GamePublic struct {
 	Winner          string `json:"winner"`
 }
 
-func toIcal(games []Game) string {
+func toIcal(games []Game, location *time.Location) string {
 
 	cal := ics.NewCalendar()
 	cal.SetMethod(ics.MethodRequest)
-	//cal.SetTimezoneId("Europe/Zurich")
-	location, err := time.LoadLocation("Europe/Zurich")
-	if err != nil {
-		panic(err)
-	}
 
 	for _, game := range games {
 		event := cal.AddEvent(fmt.Sprintf("sv-%d", game.GameId))
