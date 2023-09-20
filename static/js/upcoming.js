@@ -1,13 +1,13 @@
 var oTable;
 
-function dwnlCal(){
-	alert("download cal")
-}
 
 
 $( document ).ready(function() {
 	
 	teams = []
+	//alert(moment.locale())
+	//moment().locale('fr-fr')
+	//alert(moment.locale())
 	
 	$.getJSON("/teams", function(result){
 		$.each(result, function(i, field){
@@ -38,10 +38,15 @@ $( document ).ready(function() {
 				'url': '/upcoming',
 				'dataSrc': ''
 			},
+			columnDefs: [
+				{ type: "date", targets: 0 }
+			],
 			columns: [
 				{
-					data: 'playDate',
-					render: DataTable.render.datetime('dddd DD.MM.YYYY HH:mm')
+					data: 'playDate',					
+					render: function(data, type, full) {
+						return moment(data, "YYYY-MM-DD HH:mm:ss").format("dddd DD.MM.YYYY HH:mm")
+					}
 				},{
 					data: 'homeTeam'
 				},{
