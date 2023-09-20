@@ -41,7 +41,7 @@ $( document ).ready(function() {
 			columns: [
 				{
 					data: 'playDate',
-					render: DataTable.render.datetime('DD.MM.YYYY HH:mm')
+					render: DataTable.render.datetime('dddd DD.MM.YYYY HH:mm')
 				},{
 					data: 'homeTeam'
 				},{

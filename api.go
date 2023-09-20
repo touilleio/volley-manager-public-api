@@ -8,6 +8,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -31,8 +32,9 @@ func newApi(state *state) *api {
 }
 
 const (
-	timeFormat = "2006-01-02 15:04:05"
-	timezone   = "Europe/Zurich"
+	timeFormat       = "2006-01-02 15:04:05"
+	outputTimeFormat = "Monday 02.01.2006 15h04"
+	timezone         = "Europe/Zurich"
 )
 
 func (a *api) upcomingGames(c *gin.Context) {
@@ -138,9 +140,19 @@ func (a api) run(address string, g *errgroup.Group) {
 	})
 }
 
-func toGamePublic(game Game) GamePublic {
+var daysInFrench = strings.NewReplacer(
+	"Monday", "Lundi",
+	"Tuesday", "Mardi",
+	"Wednesday", "Mercredi",
+	"Thursday", "Jeudi",
+	"Friday", "Vendredi",
+	"Saturday", "Samedi",
+	"Sunday", "Dimanche")
+
+func toGamePublic(game Game, location *time.Location) GamePublic {
+	//parsedTime, _ := time.ParseInLocation(timeFormat, game.PlayDate, location)
 	gp := GamePublic{
-		PlayDate: game.PlayDate,
+		PlayDate: game.PlayDate, //daysInFrench.Replace(parsedTime.In(location).Format(outputTimeFormat)),
 		HomeTeam: game.Teams.Home.Caption,
 		AwayTeam: game.Teams.Away.Caption,
 		League:   game.League.Caption,
@@ -189,7 +201,7 @@ func getPastGames(games []Game, location *time.Location) []Game {
 func toUpcomingGamesPublic(games []Game, location *time.Location) []GamePublic {
 	gamesPublic := make([]GamePublic, 0, len(games))
 	for _, g := range getUpcomingGames(games, location) {
-		gamesPublic = append(gamesPublic, toGamePublic(g))
+		gamesPublic = append(gamesPublic, toGamePublic(g, location))
 	}
 	return gamesPublic
 }
@@ -197,7 +209,7 @@ func toUpcomingGamesPublic(games []Game, location *time.Location) []GamePublic {
 func toPastGamesPublic(games []Game, location *time.Location) []GamePublic {
 	gamesPublic := make([]GamePublic, 0, len(games))
 	for _, g := range getPastGames(games, location) {
-		gamesPublic = append(gamesPublic, toGamePublic(g))
+		gamesPublic = append(gamesPublic, toGamePublic(g, location))
 	}
 	return gamesPublic
 }
