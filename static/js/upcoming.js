@@ -6,6 +6,12 @@ function capitalizeFirstLetter(string) {
 
 $( document ).ready(function() {
 	
+	$('.page_menu a').each(function(e) {
+		if(window.location.pathname.includes($(this).attr('href'))){
+			$(this).attr('class', 'active');
+		}
+    });
+	
 	teams = []
 	//alert(moment.locale())
 	//moment().locale('fr-fr')

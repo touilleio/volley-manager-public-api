@@ -807,6 +807,29 @@ body {
     -webkit-font-smoothing: inherit
 }
 
+#menu
+
+div.page_menu li{
+	display: inline;
+	padding: 15px;
+}
+
+div.page_menu a {
+padding-right:10px;
+display: inline-block;
+position: relative;
+}
+
+div.page_menu a:hover{
+	color: black;
+}
+
+.active {
+	color: black;
+	font-weight: bold;
+	text-decoration: underline;
+}
+
 p {
     margin: 1em 0
 }
@@ -820,9 +843,9 @@ p:last-child {
 }
 
 a {
+	text-decoration: none;
     cursor: pointer;
-    color: #bb2525;
-    text-decoration: none
+    color: black;
 }
 
 p a[href^=http]:not([href*="datatables.net"]) {
@@ -1804,7 +1827,7 @@ div.fw-container div.fw-body {
 
 div.fw-container div.fw-body div.content {
     position: relative;
-    margin-top: 7em
+    margin-top: 3em
 }
 
 div.fw-container div.fw-body div.content>h1 {
