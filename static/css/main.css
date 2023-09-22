@@ -807,7 +807,11 @@ body {
     -webkit-font-smoothing: inherit
 }
 
-#menu
+<!-- logo -->
+
+
+
+<!-- menu -->
 
 div.page_menu li{
 	display: inline;
@@ -815,9 +819,19 @@ div.page_menu li{
 }
 
 div.page_menu a {
-padding-right:10px;
-display: inline-block;
-position: relative;
+	left: -40px;
+	padding-right:10px;
+	display: inline-block;
+	position: relative;
+}
+
+#logo{
+    top: 10px;
+    left: -40px;
+    padding: 138px 0 0 254px;
+    background-image: url(../img/logo_giblouxvolley.svg) !important;
+    background-position: center center !important;
+    background-size: 254px 138px !important;
 }
 
 div.page_menu a:hover{
@@ -825,9 +839,8 @@ div.page_menu a:hover{
 }
 
 .active {
-	color: black;
-	font-weight: bold;
-	text-decoration: underline;
+	color: #545454;
+	opacity: 0.5;
 }
 
 p {
@@ -842,10 +855,13 @@ p:last-child {
     margin-bottom: 0
 }
 
-a {
+.page_menu a {
+	text-transform: uppercase;
+	font-weight: 400;
 	text-decoration: none;
     cursor: pointer;
-    color: black;
+    color: #545454;
+	font-size: medium;
 }
 
 p a[href^=http]:not([href*="datatables.net"]) {
@@ -854,7 +870,7 @@ p a[href^=http]:not([href*="datatables.net"]) {
 }
 
 a:hover {
-    text-decoration: underline
+    opacity: 0.5;
 }
 
 img.lightbox {
@@ -1831,12 +1847,13 @@ div.fw-container div.fw-body div.content {
 }
 
 div.fw-container div.fw-body div.content>h1 {
+	margin-top: 20px !important;
     top: -1.15em;
     left: 0;
     width: 100%;
     margin: 0;
     font-weight: bold;
-    font-size: 2em;
+    font-size: 1.5em;
     line-height: 1.2em;
     white-space: nowrap;
     overflow: hidden;
@@ -2555,6 +2572,16 @@ body.example div.dt-tailwindcss .grid:before {
 }
 
 @media screen and (max-width: 767px),screen and (max-width: 768px)and (orientation: portrait) {
+	
+	#logo{
+		display:none;
+	}
+	
+	div.page_menu a {
+		left: 0px;
+		font-size: small;
+	}	
+	
     body.example div.info {
         -webkit-column-count:1;
         -moz-column-count: 1;
