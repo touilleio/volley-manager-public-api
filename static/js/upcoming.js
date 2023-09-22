@@ -1,6 +1,8 @@
 var oTable;
 
-
+function capitalizeFirstLetter(string) {
+    return string.charAt(0).toUpperCase() + string.slice(1);
+}
 
 $( document ).ready(function() {
 	
@@ -45,7 +47,7 @@ $( document ).ready(function() {
 				{
 					data: 'playDate',					
 					render: function(data, type, full) {
-						return moment(data, "YYYY-MM-DD HH:mm:ss").format("dddd DD.MM.YYYY HH:mm")
+						return capitalizeFirstLetter(moment(data, "YYYY-MM-DD HH:mm:ss").format("dddd DD.MM.YYYY HH:mm"))
 					}
 				},{
 					data: 'homeTeam'
