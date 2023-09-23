@@ -28,7 +28,7 @@ $( document ).ready(function() {
 		}
 		
 		//console.log( "ready!" );
-		oTable = new DataTable('#example', {
+		oTable = new DataTable('#pastmatches', {
 			responsive: true,
 			pageLength: 10,
 			language: {

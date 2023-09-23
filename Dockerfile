@@ -23,9 +23,6 @@ RUN env GOOS=${TARGETOS} GOARCH=${TARGETARCH} CGO_ENABLED=0 \
     .
 
 FROM --platform=$BUILDPLATFORM alpine:3.18
-COPY --from=builder /src/volley-manager-public-api .
-COPY ./static /static
-
 RUN apk add --no-cache tzdata
 
 USER nobody
@@ -33,3 +30,7 @@ USER nobody
 ENTRYPOINT ["/volley-manager-public-api"]
 
 EXPOSE 8080
+
+COPY --from=builder /src/volley-manager-public-api .
+COPY ./static /static
+
