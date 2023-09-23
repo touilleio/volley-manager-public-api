@@ -117,7 +117,6 @@ func (a *api) teams(c *gin.Context) {
 func (a api) run(address string, g *errgroup.Group) {
 
 	r := gin.Default()
-	r.StaticFS("/static", http.Dir("/static"))
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "pong",
@@ -130,6 +129,11 @@ func (a api) run(address string, g *errgroup.Group) {
 	r.GET("/past/:teamid", a.teamPastGames)
 	r.GET("/ranking/:teamid", a.teamRanking)
 	r.GET("/teams", a.teams)
+
+	r.Static("/static", "/static")
+	r.GET("/", func(c *gin.Context) {
+		c.Redirect(http.StatusMovedPermanently, "/static")
+	})
 
 	g.Go(func() error {
 		err := r.Run(address)

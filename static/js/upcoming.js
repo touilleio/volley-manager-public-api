@@ -35,7 +35,7 @@ $( document ).ready(function() {
 		}
 		
 		//console.log( "ready!" );
-		oTable = new DataTable('#example', {
+		oTable = new DataTable('#upcomingmatches', {
 			responsive: true,
 			pageLength: 10,
 			language: {
