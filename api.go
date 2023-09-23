@@ -101,7 +101,18 @@ func (a *api) teamRanking(c *gin.Context) {
 		return
 	}
 	rankings := a.state.rankingPerTeam[teamId]
-	c.JSON(http.StatusOK, rankings.Ranking)
+
+	dedupTeamRanking := make([]TeamRanking, 0, len(rankings.Ranking))
+	teams := make(map[string]bool)
+
+	for _, r := range rankings.Ranking {
+		_, ok := teams[r.TeamCaption]
+		if !ok {
+			dedupTeamRanking = append(dedupTeamRanking, r)
+			teams[r.TeamCaption] = true
+		}
+	}
+	c.JSON(http.StatusOK, dedupTeamRanking)
 }
 
 func (a *api) teams(c *gin.Context) {
