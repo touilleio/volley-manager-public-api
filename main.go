@@ -72,18 +72,22 @@ func main() {
 	theFetcher, err := newFetcher(env.APIKey, theState)
 	if err != nil {
 		log.WithError(err).Error("Got an error while instantiating the fetcher")
+		return
 	}
 
-	// Loop
+	// First fetch must complete
+	err = run(theFetcher, theState)
+	if err != nil {
+		log.WithError(err).Error("Got an error while fetching the data for the first time")
+		return
+	}
+
+	// Fetch loop
 	g.Go(func() error {
-		err := run(theFetcher, theState)
-		if err != nil {
-			return err
-		}
 		for range time.Tick(env.RefreshInterval) {
 			err = run(theFetcher, theState)
 			if err != nil {
-				return err
+				log.WithError(err).Warnf("Got an error while fetching the data. Keeping the old version instead of terminating here.")
 			}
 		}
 		return nil
