@@ -13,20 +13,30 @@ import (
 )
 
 type api struct {
-	state    *state
-	location *time.Location
+	state                  *state
+	teamCaptionReplacement map[string]string
+	location               *time.Location
 }
 
-func newApi(state *state) *api {
+func newApi(state *state, teamCaptionReplacementList []string) *api {
 
 	location, err := time.LoadLocation(timezone)
 	if err != nil {
 		panic(err)
 	}
 
+	teamCaptionReplacement := make(map[string]string)
+	for _, t := range teamCaptionReplacementList {
+		parts := strings.Split(t, ":")
+		if len(parts) >= 2 {
+			teamCaptionReplacement[parts[0]] = parts[1]
+		}
+	}
+
 	api := api{
-		state:    state,
-		location: location,
+		state:                  state,
+		teamCaptionReplacement: teamCaptionReplacement,
+		location:               location,
 	}
 	return &api
 }
@@ -38,7 +48,7 @@ const (
 )
 
 func (a *api) upcomingGames(c *gin.Context) {
-	gamesPublic := toUpcomingGamesPublic(a.state.rawGames, a.location)
+	gamesPublic := toUpcomingGamesPublic(a.state.rawGames, a.location, a.teamCaptionReplacement)
 	c.JSON(http.StatusOK, gamesPublic)
 }
 
@@ -51,7 +61,7 @@ func (a *api) teamUpcomingGames(c *gin.Context) {
 		c.String(http.StatusBadRequest, "Invalid teamId %s, err = %s", teamIdStr, err.Error())
 		return
 	}
-	gamesPublic := toUpcomingGamesPublic(a.state.gamesPerTeam[teamId], a.location)
+	gamesPublic := toUpcomingGamesPublic(a.state.gamesPerTeam[teamId], a.location, a.teamCaptionReplacement)
 	c.JSON(http.StatusOK, gamesPublic)
 }
 
@@ -74,7 +84,7 @@ func (a *api) teamUpcomingGamesICS(c *gin.Context) {
 }
 
 func (a *api) pastGames(c *gin.Context) {
-	gamesPublic := toPastGamesPublic(a.state.rawGames, a.location)
+	gamesPublic := toPastGamesPublic(a.state.rawGames, a.location, a.teamCaptionReplacement)
 	c.JSON(http.StatusOK, gamesPublic)
 }
 
@@ -87,7 +97,7 @@ func (a *api) teamPastGames(c *gin.Context) {
 		c.String(http.StatusBadRequest, "Invalid teamId %s, err = %s", teamIdStr, err.Error())
 		return
 	}
-	gamesPublic := toPastGamesPublic(a.state.gamesPerTeam[teamId], a.location)
+	gamesPublic := toPastGamesPublic(a.state.gamesPerTeam[teamId], a.location, a.teamCaptionReplacement)
 	c.JSON(http.StatusOK, gamesPublic)
 }
 
@@ -108,8 +118,11 @@ func (a *api) teamRanking(c *gin.Context) {
 	for _, r := range rankings.Ranking {
 		_, ok := teams[r.TeamCaption]
 		if !ok {
-			dedupTeamRanking = append(dedupTeamRanking, r)
 			teams[r.TeamCaption] = true
+			if replacement, ok := a.teamCaptionReplacement[r.TeamCaption]; ok {
+				r.TeamCaption = replacement
+			}
+			dedupTeamRanking = append(dedupTeamRanking, r)
 		}
 	}
 	c.JSON(http.StatusOK, dedupTeamRanking)
@@ -120,7 +133,11 @@ func (a *api) teams(c *gin.Context) {
 	defer a.state.lock.RUnlock()
 	teams := make(map[int]string, len(a.state.teams))
 	for k, v := range a.state.teams {
-		teams[k] = v.Caption
+		if replacement, ok := a.teamCaptionReplacement[v.Caption]; ok {
+			teams[k] = replacement
+		} else {
+			teams[k] = v.Caption
+		}
 	}
 	c.JSON(http.StatusOK, teams)
 }
@@ -164,12 +181,20 @@ var daysInFrench = strings.NewReplacer(
 	"Saturday", "Samedi",
 	"Sunday", "Dimanche")
 
-func toGamePublic(game Game, location *time.Location) GamePublic {
+func toGamePublic(game Game, location *time.Location, teamCaptionReplacements map[string]string) GamePublic {
 	//parsedTime, _ := time.ParseInLocation(timeFormat, game.PlayDate, location)
+	homeTeam := game.Teams.Home.Caption
+	if replacement, ok := teamCaptionReplacements[homeTeam]; ok {
+		homeTeam = replacement
+	}
+	awayTeam := game.Teams.Away.Caption
+	if replacement, ok := teamCaptionReplacements[awayTeam]; ok {
+		awayTeam = replacement
+	}
 	gp := GamePublic{
 		PlayDate: game.PlayDate, //daysInFrench.Replace(parsedTime.In(location).Format(outputTimeFormat)),
-		HomeTeam: game.Teams.Home.Caption,
-		AwayTeam: game.Teams.Away.Caption,
+		HomeTeam: homeTeam,
+		AwayTeam: awayTeam,
 		League:   game.League.Caption,
 		Hall:     fmt.Sprintf("%s, %s", game.Hall.Caption, game.Hall.City),
 	}
@@ -213,18 +238,18 @@ func getPastGames(games []Game, location *time.Location) []Game {
 	return upcomingGames
 }
 
-func toUpcomingGamesPublic(games []Game, location *time.Location) []GamePublic {
+func toUpcomingGamesPublic(games []Game, location *time.Location, teamCaptionReplacements map[string]string) []GamePublic {
 	gamesPublic := make([]GamePublic, 0, len(games))
 	for _, g := range getUpcomingGames(games, location) {
-		gamesPublic = append(gamesPublic, toGamePublic(g, location))
+		gamesPublic = append(gamesPublic, toGamePublic(g, location, teamCaptionReplacements))
 	}
 	return gamesPublic
 }
 
-func toPastGamesPublic(games []Game, location *time.Location) []GamePublic {
+func toPastGamesPublic(games []Game, location *time.Location, teamCaptionReplacements map[string]string) []GamePublic {
 	gamesPublic := make([]GamePublic, 0, len(games))
 	for _, g := range getPastGames(games, location) {
-		gamesPublic = append(gamesPublic, toGamePublic(g, location))
+		gamesPublic = append(gamesPublic, toGamePublic(g, location, teamCaptionReplacements))
 	}
 	return gamesPublic
 }

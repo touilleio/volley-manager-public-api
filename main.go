@@ -20,15 +20,16 @@ var (
 )
 
 type EnvConfig struct {
-	APIKey           string        `envconfig:"API_KEY"`
-	RefreshInterval  time.Duration `envconfig:"REFRESH_INTERVAL" default:"1h"`
-	TeamsId          []int         `envconfig:"TEAMS_ID" default:"6631,6632,6633,6634,6635,6636,7681,11902,11903"`
-	BindIP           string        `envconfig:"BIND_IP" default:"0.0.0.0"`
-	Port             string        `envconfig:"PORT" default:"8080"`
-	LogLevel         string        `envconfig:"LOG_LEVEL" default:"debug"`
-	MetricsNamespace string        `envconfig:"METRICS_NAMESPACE" default:""`
-	MetricsSubsystem string        `envconfig:"METRICS_SUBSYSTEM" default:""`
-	MetricsPath      string        `envconfig:"METRICS_PATH" default:"/metrics"`
+	APIKey                 string        `envconfig:"API_KEY"`
+	RefreshInterval        time.Duration `envconfig:"REFRESH_INTERVAL" default:"1h"`
+	TeamsId                []int         `envconfig:"TEAMS_ID" default:"6631,6632,6633,6634,6635,6636,7681,11902,11903"`
+	TeamCaptionReplacement []string      `envconfig:"TEAM_CAPTION_REPLACEMENT" default:"Gibloux Volley:Gibloux Volley F1,Gibloux Volley F19:Gibloux Volley F19 A"`
+	BindIP                 string        `envconfig:"BIND_IP" default:"0.0.0.0"`
+	Port                   string        `envconfig:"PORT" default:"8080"`
+	LogLevel               string        `envconfig:"LOG_LEVEL" default:"debug"`
+	MetricsNamespace       string        `envconfig:"METRICS_NAMESPACE" default:""`
+	MetricsSubsystem       string        `envconfig:"METRICS_SUBSYSTEM" default:""`
+	MetricsPath            string        `envconfig:"METRICS_PATH" default:"/metrics"`
 }
 
 func main() {
@@ -94,7 +95,7 @@ func main() {
 	})
 
 	// The API will server the request with the data from the state
-	theApi := newApi(theState)
+	theApi := newApi(theState, env.TeamCaptionReplacement)
 	theApi.run(fmt.Sprintf("%s:%s", env.BindIP, env.Port), g)
 
 	// Wait for any shutdown
