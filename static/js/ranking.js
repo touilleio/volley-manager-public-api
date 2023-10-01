@@ -57,7 +57,7 @@ $( document ).ready(function() {
 						},{
 							data: 'teamCaption'
 						},{
-							data: 'rawGames'
+							data: 'games'
 						},{
 							data: 'wins',
 							render: function(data, clazz, row) {

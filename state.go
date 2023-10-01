@@ -172,7 +172,7 @@ type TeamRanking struct {
 	Rank          int    `json:"rank"`
 	TeamId        int    `json:"teamId,omitempty"`
 	TeamCaption   string `json:"teamCaption"`
-	Games         int    `json:"rawGames"`
+	Games         int    `json:"games"`
 	Points        int    `json:"points"`
 	Wins          int    `json:"wins"`
 	WinsClear     int    `json:"winsClear"`
