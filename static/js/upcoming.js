@@ -37,7 +37,7 @@ $( document ).ready(function() {
 		//console.log( "ready!" );
 		oTable = new DataTable('#upcomingmatches', {
 			responsive: true,
-			pageLength: 10,
+			pageLength: 20,
 			language: {
 				url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/fr-FR.json',
 			},	

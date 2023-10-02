@@ -30,11 +30,11 @@ $( document ).ready(function() {
 		//console.log( "ready!" );
 		oTable = new DataTable('#pastmatches', {
 			responsive: true,
-			pageLength: 10,
+			pageLength: 20,
 			language: {
 				url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/fr-FR.json',
 			},	
-			order: [[0, "asc"]],
+			order: [[0, "desc"]],
 			ajax: {
 				'url': '/past',
 				'dataSrc': ''
