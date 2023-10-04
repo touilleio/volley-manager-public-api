@@ -35,6 +35,7 @@ $( document ).ready(function() {
 		}
 		
 		//console.log( "ready!" );
+				
 		oTable = new DataTable('#upcomingmatches', {
 			responsive: true,
 			pageLength: 20,
@@ -47,11 +48,11 @@ $( document ).ready(function() {
 				'dataSrc': ''
 			},
 			columnDefs: [
-				{ type: "date", targets: 0 }
+				{ type: "de_datetime", targets: 0 }
 			],
 			columns: [
 				{
-					data: 'playDate',					
+					data: 'playDate',		
 					render: function(data, type, full) {
 						return capitalizeFirstLetter(moment(data, "YYYY-MM-DD HH:mm:ss").format("dddd DD.MM.YYYY HH:mm"))
 					}
