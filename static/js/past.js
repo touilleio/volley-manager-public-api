@@ -1,5 +1,9 @@
 var oTable;
 
+function capitalizeFirstLetter(string) {
+    return string.charAt(0).toUpperCase() + string.slice(1);
+}
+
 $( document ).ready(function() {
 	
 	$('.page_menu a').each(function(e) {
@@ -42,7 +46,9 @@ $( document ).ready(function() {
 			columns: [
 				{
 					data: 'playDate',
-					render: DataTable.render.datetime('DD.MM.YYYY HH:mm')
+					render: function(data, type, full) {
+						return capitalizeFirstLetter(moment(data, "YYYY-MM-DD HH:mm:ss").format("dddd DD.MM.YYYY HH:mm"))
+					}
 				},{
 					data: 'homeTeam'
 				},{
