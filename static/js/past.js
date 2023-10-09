@@ -43,6 +43,9 @@ $( document ).ready(function() {
 				'url': '/past',
 				'dataSrc': ''
 			},
+			columnDefs: [
+				{ type: "de_datetime", targets: 0 }
+			],
 			columns: [
 				{
 					data: 'playDate',
