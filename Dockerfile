@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.20-alpine3.18 as builder
+FROM --platform=$BUILDPLATFORM golang:1.22-alpine3.19 as builder
 
 ARG TARGETOS
 ARG TARGETARCH
@@ -22,7 +22,7 @@ RUN env GOOS=${TARGETOS} GOARCH=${TARGETARCH} CGO_ENABLED=0 \
     			-X github.com/sqooba/go-common/version.Version=${VERSION}" \
     .
 
-FROM --platform=$BUILDPLATFORM alpine:3.18
+FROM --platform=$BUILDPLATFORM alpine:3.19
 RUN apk add --no-cache tzdata
 
 USER nobody

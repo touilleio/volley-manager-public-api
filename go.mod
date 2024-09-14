@@ -1,6 +1,6 @@
 module github.com/touilleio/volley-manager-public-api
 
-go 1.20
+go 1.22
 
 require (
 	github.com/arran4/golang-ical v0.1.0

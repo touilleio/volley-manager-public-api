@@ -35,7 +35,8 @@ build:
 		-o volley-manager-public-api .
 
 package:
-	docker build -f Dockerfile \
+	docker buildx build -f Dockerfile \
+		--platform $(BUILD_PLATFORM) \
 		--build-arg VERSION=$(VERSION) \
 		--build-arg BUILD_DATE=$(BUILD_DATE) \
 		--build-arg GIT_COMMIT=${GIT_COMMIT}${GIT_DIRTY} \
