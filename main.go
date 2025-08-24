@@ -5,14 +5,15 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/kelseyhightower/envconfig"
-	"github.com/sqooba/go-common/logging"
-	"github.com/sqooba/go-common/version"
-	"golang.org/x/sync/errgroup"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/kelseyhightower/envconfig"
+	"github.com/sqooba/go-common/logging"
+	"github.com/sqooba/go-common/version"
+	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -20,17 +21,17 @@ var (
 )
 
 type EnvConfig struct {
-	APIKey                 string        `envconfig:"API_KEY"`
-	RefreshInterval        time.Duration `envconfig:"REFRESH_INTERVAL" default:"1h"`
+	APIKey          string        `envconfig:"API_KEY"`
+	RefreshInterval time.Duration `envconfig:"REFRESH_INTERVAL" default:"1h"`
 	// ClubId 906295
-	TeamsId                []int         `envconfig:"TEAMS_ID" default:"6631,6632,6633,6634,6635,6636,7681,11902,11903,12625,12855"`
-	TeamCaptionReplacement []string      `envconfig:"TEAM_CAPTION_REPLACEMENT" default:"Gibloux Volley:Gibloux Volley F1,Gibloux Volley F19:Gibloux Volley F19 A"`
-	BindIP                 string        `envconfig:"BIND_IP" default:"0.0.0.0"`
-	Port                   string        `envconfig:"PORT" default:"8080"`
-	LogLevel               string        `envconfig:"LOG_LEVEL" default:"debug"`
-	MetricsNamespace       string        `envconfig:"METRICS_NAMESPACE" default:""`
-	MetricsSubsystem       string        `envconfig:"METRICS_SUBSYSTEM" default:""`
-	MetricsPath            string        `envconfig:"METRICS_PATH" default:"/metrics"`
+	TeamsId                []int    `envconfig:"TEAMS_ID" default:"6631,6632,6633,6634,6635,6636,7681,11902,12625,12855,13763,14019"`
+	TeamCaptionReplacement []string `envconfig:"TEAM_CAPTION_REPLACEMENT" default:"Gibloux Volley:Gibloux Volley F1,Gibloux Volley F4 A:Gibloux Volley F4,Gibloux Volley F20A:Gibloux Volley F20,Gibloux Volley H3a:Gibloux Volley H3 raclette,Gibloux Volley H3b:Gibloux Volley H3 tofu"`
+	BindIP                 string   `envconfig:"BIND_IP" default:"0.0.0.0"`
+	Port                   string   `envconfig:"PORT" default:"8080"`
+	LogLevel               string   `envconfig:"LOG_LEVEL" default:"debug"`
+	MetricsNamespace       string   `envconfig:"METRICS_NAMESPACE" default:""`
+	MetricsSubsystem       string   `envconfig:"METRICS_SUBSYSTEM" default:""`
+	MetricsPath            string   `envconfig:"METRICS_PATH" default:"/metrics"`
 }
 
 func main() {

@@ -1,7 +1,7 @@
 package main
 
 import (
-    "bytes"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -63,12 +63,12 @@ func (f fetcher) fetch() error {
 		fmt.Printf("Error reading response body: %v\n", err)
 		return err
 	}
-	
+
 	fmt.Printf("used apiKey: %v\n", f.apiKey)
-	
+
 	var games []Game
 	if err := json.Unmarshal(body, &games); err != nil {
-	    fmt.Printf("Body: %v\n", bytes.NewBuffer(body).String())
+		fmt.Printf("Body: %v\n", bytes.NewBuffer(body).String())
 		fmt.Printf("Error unmarshalling games response: %v\n", err)
 		return err
 	}
@@ -96,7 +96,7 @@ func (f fetcher) fetch() error {
 
 	var rankings []GroupRankings
 	if err := json.Unmarshal(body, &rankings); err != nil {
-	    fmt.Printf("Body: %v\n", bytes.NewBuffer(body).String())
+		fmt.Printf("Body: %v\n", bytes.NewBuffer(body).String())
 		fmt.Printf("Error unmarshalling rankings response: %v\n", err)
 		return err
 	}
