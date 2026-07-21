@@ -22,8 +22,11 @@ RUN env GOOS=${TARGETOS} GOARCH=${TARGETARCH} CGO_ENABLED=0 \
     			-X github.com/sqooba/go-common/version.Version=${VERSION}" \
     .
 
-FROM --platform=$BUILDPLATFORM alpine:3.22
+FROM --platform=$BUILDPLATFORM alpine:3.23
 RUN apk add --no-cache tzdata
+
+# Games snapshot dir; named volumes inherit this ownership, so nobody can write to them.
+RUN mkdir -p /data && chown nobody:nobody /data
 
 USER nobody
 

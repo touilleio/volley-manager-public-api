@@ -31,6 +31,9 @@ type EnvConfig struct {
 	MetricsNamespace       string        `envconfig:"METRICS_NAMESPACE" default:""`
 	MetricsSubsystem       string        `envconfig:"METRICS_SUBSYSTEM" default:""`
 	MetricsPath            string        `envconfig:"METRICS_PATH" default:"/metrics"`
+	TelegramBotToken       string        `envconfig:"TELEGRAM_BOT_TOKEN" default:""`
+	TelegramChatID         string        `envconfig:"TELEGRAM_CHAT_ID" default:""`
+	StateSnapshotPath      string        `envconfig:"STATE_SNAPSHOT_PATH" default:"/data/games-snapshot.json"`
 }
 
 func main() {
@@ -70,6 +73,23 @@ func main() {
 	// The state where information are stored
 	theState := newState(env.TeamsId)
 
+	// Without Telegram credentials, moved matches are logged instead of being sent.
+	var matchNotifier notifier = newLogNotifier(os.Stdout)
+	if env.TelegramBotToken != "" && env.TelegramChatID != "" {
+		matchNotifier = newTelegramNotifier(env.TelegramBotToken, env.TelegramChatID)
+		log.Println("Telegram notifications are enabled")
+	}
+
+	// The change detector is primed with the snapshot of the previous run, so
+	// that matches moved while the application was down are caught on the
+	// first poll after a restart. A missing or corrupt snapshot simply means
+	// the first poll establishes a fresh baseline without notifying.
+	previousGames, err := loadSnapshot(env.StateSnapshotPath)
+	if err != nil {
+		log.WithError(err).Warnf("Could not load games snapshot %s, starting with a fresh baseline", env.StateSnapshotPath)
+	}
+	detector := newChangeDetector(previousGames)
+
 	// The fetcher will poll the Volley Manager API at a given rate
 	theFetcher, err := newFetcher(env.APIKey, theState)
 	if err != nil {
@@ -78,7 +98,7 @@ func main() {
 	}
 
 	// First fetch must complete
-	err = run(theFetcher, theState)
+	err = run(theFetcher, theState, detector, matchNotifier, env.StateSnapshotPath)
 	if err != nil {
 		log.WithError(err).Error("Got an error while fetching the data for the first time")
 		return
@@ -87,7 +107,7 @@ func main() {
 	// Fetch loop
 	g.Go(func() error {
 		for range time.Tick(env.RefreshInterval) {
-			err = run(theFetcher, theState)
+			err = run(theFetcher, theState, detector, matchNotifier, env.StateSnapshotPath)
 			if err != nil {
 				log.WithError(err).Warnf("Got an error while fetching the data. Keeping the old version instead of terminating here.")
 			}
@@ -118,7 +138,7 @@ func main() {
 	}
 }
 
-func run(f *fetcher, s *state) error {
+func run(f *fetcher, s *state, detector *changeDetector, matchNotifier notifier, snapshotPath string) error {
 
 	err := f.fetch()
 	if err != nil {
@@ -212,6 +232,17 @@ func run(f *fetcher, s *state) error {
 	s.leaguePerTeam = leaguePerTeam
 	s.groupPerTeam = groupPerTeam
 	s.lock.Unlock()
+
+	// Notification and snapshot failures never fail the poll; fresh data is already live.
+	if changes := detector.diff(allGames, time.Now()); len(changes) > 0 {
+		fmt.Printf("Detected %d changed game(s)\n", len(changes))
+		if err := matchNotifier.notifyChanges(context.Background(), changes); err != nil {
+			fmt.Printf("Error sending change notification: %v\n", err)
+		}
+	}
+	if err := saveSnapshot(snapshotPath, allGames); err != nil {
+		fmt.Printf("Error saving games snapshot: %v\n", err)
+	}
 
 	return nil
 }

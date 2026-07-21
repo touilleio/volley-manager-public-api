@@ -1,16 +1,21 @@
-version: "3"
 services:
   public-api:
-    image: touilleio/volley-manager-public-api:v1.0.0
+    image: touilleio/volley-manager-public-api:v2.0.0
     restart: unless-stopped
     build:
       context: .
       dockerfile: Dockerfile
     environment:
       - API_KEY
+      - TELEGRAM_BOT_TOKEN
+      - TELEGRAM_CHAT_ID
     ports:
       - 8080:8080
     security_opt:
       - no-new-privileges:true
     volumes:
       - ./static:/static
+      - data:/data
+
+volumes:
+  data:
