@@ -1,5 +1,5 @@
 
-VERSION=v1.0.0
+VERSION=v2.0.0
 GOCMD=go
 GOBUILD=$(GOCMD) build
 GOCLEAN=$(GOCMD) clean
@@ -10,7 +10,7 @@ PACKAGE_PLATFORM=$(BUILD_PLATFORM)
 VERSION_MAJOR=$(shell echo $(VERSION) | cut -f1 -d.)
 VERSION_MINOR=$(shell echo $(VERSION) | cut -f2 -d.)
 GO_PACKAGE_PREFIX=touilleio/volley-manager-public-api
-DOCKER_REGISTRY=
+DOCKER_REGISTRY=docker.io/
 GIT_COMMIT=$(shell git rev-parse HEAD)
 GIT_DIRTY=$(shell test -n "`git status --porcelain`" && echo "+CHANGES" || true)
 BUILD_DATE=$(shell date '+%Y-%m-%d-%H:%M:%S')
