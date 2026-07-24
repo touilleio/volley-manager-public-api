@@ -1,0 +1,50 @@
+package main
+
+import (
+	"context"
+	"time"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/sqooba/go-common/version"
+)
+
+type matchesOutput struct {
+	Matches []GamePublic `json:"matches" jsonschema:"the club matches in the requested time window"`
+}
+
+type noInput struct{}
+
+func newMcpServer(s *state, location *time.Location, teamCaptionReplacement map[string]string) *mcp.Server {
+	server := mcp.NewServer(&mcp.Implementation{
+		Name:    "volley-manager-public-api",
+		Version: version.Version,
+	}, nil)
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "get_next_week_upcoming_matches",
+		Description: "Get the club's upcoming matches of next week (Monday to Sunday)",
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ noInput) (*mcp.CallToolResult, matchesOutput, error) {
+		return nil, nextWeekMatches(s, time.Now(), location, teamCaptionReplacement), nil
+	})
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "get_current_week_match_results",
+		Description: "Get the club's match results of the current week (from Monday up to now)",
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ noInput) (*mcp.CallToolResult, matchesOutput, error) {
+		return nil, currentWeekResults(s, time.Now(), location, teamCaptionReplacement), nil
+	})
+
+	return server
+}
+
+func nextWeekMatches(s *state, now time.Time, location *time.Location, teamCaptionReplacement map[string]string) matchesOutput {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return matchesOutput{Matches: toGamesPublic(getNextWeekGames(s.rawGames, now, location), location, teamCaptionReplacement)}
+}
+
+func currentWeekResults(s *state, now time.Time, location *time.Location, teamCaptionReplacement map[string]string) matchesOutput {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return matchesOutput{Matches: toGamesPublic(getCurrentWeekGames(s.rawGames, now, location), location, teamCaptionReplacement)}
+}

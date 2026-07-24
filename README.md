@@ -43,3 +43,12 @@ the `data` docker volume.
 To enable it, create a bot with [@BotFather](https://t.me/BotFather), invite it to your
 group/chat, and set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in your `.env` file
 (see [.env-example](./.env-example)). When unset, moved matches are written to the application logs instead.
+
+# MCP server
+
+An [MCP](https://modelcontextprotocol.io) endpoint is exposed at `/mcp` (streamable HTTP), so AI
+assistants can query the club's matches directly. Two tools are available, using calendar weeks
+running Monday to Sunday (Europe/Zurich):
+
+- `get_next_week_upcoming_matches` — matches of next week
+- `get_current_week_match_results` — match results of the current week, from Monday up to now

@@ -2,10 +2,12 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 /*
@@ -36,15 +38,15 @@ func newFetcher(apiKey string, state *state) (*fetcher, error) {
 	internalFetcher := fetcher{
 		apiKey:     apiKey,
 		state:      state,
-		httpClient: &http.Client{},
+		httpClient: &http.Client{Timeout: 30 * time.Second},
 	}
 	return &internalFetcher, nil
 }
 
-func (f fetcher) fetch() error {
+func (f fetcher) fetch(ctx context.Context) error {
 
 	// Fetch rawGames collection
-	req, err := http.NewRequest("GET", gamesCollectionUri, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", gamesCollectionUri, nil)
 	if err != nil {
 		fmt.Printf("Error creating request: %v\n", err)
 		return err
@@ -72,7 +74,7 @@ func (f fetcher) fetch() error {
 	}
 
 	// Fetch the rawRankings
-	req, err = http.NewRequest("GET", clubRankingsUri, nil)
+	req, err = http.NewRequestWithContext(ctx, "GET", clubRankingsUri, nil)
 	if err != nil {
 		fmt.Printf("Error creating request: %v\n", err)
 		return err

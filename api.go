@@ -2,14 +2,16 @@ package main
 
 import (
 	"fmt"
-	ics "github.com/arran4/golang-ical"
-	"github.com/gin-gonic/gin"
-	log "github.com/sirupsen/logrus"
-	"golang.org/x/sync/errgroup"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	ics "github.com/arran4/golang-ical"
+	"github.com/gin-gonic/gin"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 type api struct {
@@ -163,6 +165,12 @@ func (a api) run(address string, g *errgroup.Group) {
 		c.Redirect(http.StatusMovedPermanently, "/static")
 	})
 
+	mcpServer := newMcpServer(a.state, a.location, a.teamCaptionReplacement)
+	mcpHandler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
+		return mcpServer
+	}, &mcp.StreamableHTTPOptions{JSONResponse: true})
+	r.Any("/mcp", gin.WrapH(mcpHandler))
+
 	g.Go(func() error {
 		err := r.Run(address)
 		if err != nil {
@@ -239,16 +247,16 @@ func getPastGames(games []Game, location *time.Location) []Game {
 }
 
 func toUpcomingGamesPublic(games []Game, location *time.Location, teamCaptionReplacements map[string]string) []GamePublic {
-	gamesPublic := make([]GamePublic, 0, len(games))
-	for _, g := range getUpcomingGames(games, location) {
-		gamesPublic = append(gamesPublic, toGamePublic(g, location, teamCaptionReplacements))
-	}
-	return gamesPublic
+	return toGamesPublic(getUpcomingGames(games, location), location, teamCaptionReplacements)
 }
 
 func toPastGamesPublic(games []Game, location *time.Location, teamCaptionReplacements map[string]string) []GamePublic {
+	return toGamesPublic(getPastGames(games, location), location, teamCaptionReplacements)
+}
+
+func toGamesPublic(games []Game, location *time.Location, teamCaptionReplacements map[string]string) []GamePublic {
 	gamesPublic := make([]GamePublic, 0, len(games))
-	for _, g := range getPastGames(games, location) {
+	for _, g := range games {
 		gamesPublic = append(gamesPublic, toGamePublic(g, location, teamCaptionReplacements))
 	}
 	return gamesPublic

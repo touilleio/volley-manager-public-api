@@ -72,6 +72,10 @@ func diffGames(previous, current []Game, now time.Time) []GameChange {
 		if prev.Teams.Away.TeamId != cur.Teams.Away.TeamId {
 			fieldChanges = append(fieldChanges, FieldChange{Field: FieldAwayTeam, Old: prev.Teams.Away.Caption, New: cur.Teams.Away.Caption})
 		}
+		// Status is 2 for both scheduled and already-played games in the API feed,
+		// so it does not mean "played"; a flip on an upcoming game signals an
+		// exceptional state (e.g. postponed/cancelled) worth notifying. Played
+		// games never reach this comparison because of the upcoming-only filter.
 		if prev.Status != cur.Status {
 			fieldChanges = append(fieldChanges, FieldChange{Field: FieldStatus, Old: strconv.Itoa(prev.Status), New: strconv.Itoa(cur.Status)})
 		}

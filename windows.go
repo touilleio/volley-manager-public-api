@@ -2,8 +2,6 @@ package main
 
 import "time"
 
-const weekDuration = 7 * 24 * time.Hour
-
 // getGamesInWindow returns the games whose play date falls in [from, to).
 // Games with an unparseable PlayDate are skipped.
 func getGamesInWindow(games []Game, from, to time.Time, location *time.Location) []Game {
@@ -20,10 +18,25 @@ func getGamesInWindow(games []Game, from, to time.Time, location *time.Location)
 	return windowGames
 }
 
-func getNextWeekGames(games []Game, now time.Time, location *time.Location) []Game {
-	return getGamesInWindow(games, now, now.Add(weekDuration), location)
+// startOfWeek returns Monday 00:00 of the week (Monday to Sunday) containing
+// t, in the given location. AddDate is used so DST transitions don't shift
+// the boundary.
+func startOfWeek(t time.Time, location *time.Location) time.Time {
+	local := t.In(location)
+	midnight := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, location)
+	daysSinceMonday := (int(local.Weekday()) + 6) % 7
+	return midnight.AddDate(0, 0, -daysSinceMonday)
 }
 
-func getLastWeekGames(games []Game, now time.Time, location *time.Location) []Game {
-	return getGamesInWindow(games, now.Add(-weekDuration), now, location)
+// getNextWeekGames returns the games of the next calendar week (Monday 00:00
+// to the following Monday 00:00).
+func getNextWeekGames(games []Game, now time.Time, location *time.Location) []Game {
+	weekStart := startOfWeek(now, location).AddDate(0, 0, 7)
+	return getGamesInWindow(games, weekStart, weekStart.AddDate(0, 0, 7), location)
+}
+
+// getCurrentWeekGames returns the games of the current calendar week, from
+// Monday 00:00 up to now.
+func getCurrentWeekGames(games []Game, now time.Time, location *time.Location) []Game {
+	return getGamesInWindow(games, startOfWeek(now, location), now, location)
 }

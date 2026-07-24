@@ -98,7 +98,7 @@ func main() {
 	}
 
 	// First fetch must complete
-	err = run(theFetcher, theState, detector, matchNotifier, env.StateSnapshotPath)
+	err = run(cancellableCtx, theFetcher, theState, detector, matchNotifier, env.StateSnapshotPath)
 	if err != nil {
 		log.WithError(err).Error("Got an error while fetching the data for the first time")
 		return
@@ -107,7 +107,7 @@ func main() {
 	// Fetch loop
 	g.Go(func() error {
 		for range time.Tick(env.RefreshInterval) {
-			err = run(theFetcher, theState, detector, matchNotifier, env.StateSnapshotPath)
+			err = run(ctx, theFetcher, theState, detector, matchNotifier, env.StateSnapshotPath)
 			if err != nil {
 				log.WithError(err).Warnf("Got an error while fetching the data. Keeping the old version instead of terminating here.")
 			}
@@ -138,9 +138,9 @@ func main() {
 	}
 }
 
-func run(f *fetcher, s *state, detector *changeDetector, matchNotifier notifier, snapshotPath string) error {
+func run(ctx context.Context, f *fetcher, s *state, detector *changeDetector, matchNotifier notifier, snapshotPath string) error {
 
-	err := f.fetch()
+	err := f.fetch(ctx)
 	if err != nil {
 		return err
 	}
@@ -236,7 +236,7 @@ func run(f *fetcher, s *state, detector *changeDetector, matchNotifier notifier,
 	// Notification and snapshot failures never fail the poll; fresh data is already live.
 	if changes := detector.diff(allGames, time.Now()); len(changes) > 0 {
 		fmt.Printf("Detected %d changed game(s)\n", len(changes))
-		if err := matchNotifier.notifyChanges(context.Background(), changes); err != nil {
+		if err := matchNotifier.notifyChanges(ctx, changes); err != nil {
 			fmt.Printf("Error sending change notification: %v\n", err)
 		}
 	}
