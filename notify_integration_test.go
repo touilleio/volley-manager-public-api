@@ -3,8 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
@@ -13,9 +11,9 @@ import (
 )
 
 // Simulates a restart followed by a poll: the detector is primed from a
-// snapshot in which one managed game was moved (date + hall), and must
-// deliver exactly one Telegram message describing that move.
-func TestPollDiffNotifiesTelegram(t *testing.T) {
+// snapshot in which one managed game was moved (date + hall), and the
+// resulting SQS message must carry that move in its payload.
+func TestPollDiffPublishesToSqs(t *testing.T) {
 	raw, err := os.ReadFile("test-data/games-with-cup.json")
 	assert.Nil(t, err)
 	var allGames []Game
@@ -49,22 +47,18 @@ func TestPollDiffNotifiesTelegram(t *testing.T) {
 	assert.Equal(t, current[0].GameId, changes[0].Game.GameId)
 	assert.Len(t, changes[0].Changes, 2)
 
-	received := make(chan string, 1)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var payload map[string]string
-		assert.Nil(t, json.NewDecoder(r.Body).Decode(&payload))
-		received <- payload["text"]
-		w.Write([]byte(`{"ok":true}`))
-	}))
-	defer server.Close()
+	stub := &stubSqsClient{}
+	publisher := &sqsPublisher{client: stub, queueURL: "queue"}
+	assert.Nil(t, publisher.publish(context.Background(), changes))
+	assert.Equal(t, 1, stub.calls)
 
-	telegram := newTelegramNotifier("TEST_TOKEN", "12345")
-	telegram.apiBase = server.URL
-	assert.Nil(t, telegram.notifyChanges(context.Background(), changes))
-
-	message := <-received
-	assert.Contains(t, message, "📅")
-	assert.Contains(t, message, "📍")
-	assert.Contains(t, message, "Ancienne Salle, Fribourg")
-	assert.Contains(t, message, current[0].Teams.Home.Caption)
+	var notification changeNotification
+	assert.Nil(t, json.Unmarshal([]byte(*stub.input.MessageBody), &notification))
+	if assert.Len(t, notification.Games, 1) {
+		assert.Equal(t, current[0].GameId, notification.Games[0].GameId)
+		assert.Equal(t, current[0].Teams.Home.Caption, notification.Games[0].HomeTeam)
+		fields := []string{notification.Games[0].Changes[0].Field, notification.Games[0].Changes[1].Field}
+		assert.Contains(t, fields, FieldPlayDate)
+		assert.Contains(t, fields, FieldHall)
+	}
 }

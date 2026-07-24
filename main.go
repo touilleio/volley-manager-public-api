@@ -31,8 +31,8 @@ type EnvConfig struct {
 	MetricsNamespace       string        `envconfig:"METRICS_NAMESPACE" default:""`
 	MetricsSubsystem       string        `envconfig:"METRICS_SUBSYSTEM" default:""`
 	MetricsPath            string        `envconfig:"METRICS_PATH" default:"/metrics"`
-	TelegramBotToken       string        `envconfig:"TELEGRAM_BOT_TOKEN" default:""`
-	TelegramChatID         string        `envconfig:"TELEGRAM_CHAT_ID" default:""`
+	SqsQueueURL            string        `envconfig:"SQS_QUEUE_URL" default:""`
+	AwsRegion              string        `envconfig:"AWS_REGION" default:"eu-central-1"`
 	StateSnapshotPath      string        `envconfig:"STATE_SNAPSHOT_PATH" default:"/data/games-snapshot.json"`
 }
 
@@ -73,11 +73,16 @@ func main() {
 	// The state where information are stored
 	theState := newState(env.TeamsId)
 
-	// Without Telegram credentials, moved matches are logged instead of being sent.
-	var matchNotifier notifier = newLogNotifier(os.Stdout)
-	if env.TelegramBotToken != "" && env.TelegramChatID != "" {
-		matchNotifier = newTelegramNotifier(env.TelegramBotToken, env.TelegramChatID)
-		log.Println("Telegram notifications are enabled")
+	// Change notifications are published to SQS; without a queue URL they are disabled.
+	var publisher *sqsPublisher
+	if env.SqsQueueURL != "" {
+		publisher, err = newSqsPublisher(cancellableCtx, env.SqsQueueURL, env.AwsRegion)
+		if err != nil {
+			log.WithError(err).Error("Got an error while instantiating the SQS publisher")
+			return
+		}
+	} else {
+		log.Println("SQS_QUEUE_URL is not set, match change notifications are disabled")
 	}
 
 	// The change detector is primed with the snapshot of the previous run, so
@@ -98,7 +103,7 @@ func main() {
 	}
 
 	// First fetch must complete
-	err = run(cancellableCtx, theFetcher, theState, detector, matchNotifier, env.StateSnapshotPath)
+	err = run(cancellableCtx, theFetcher, theState, detector, publisher, env.StateSnapshotPath)
 	if err != nil {
 		log.WithError(err).Error("Got an error while fetching the data for the first time")
 		return
@@ -107,7 +112,7 @@ func main() {
 	// Fetch loop
 	g.Go(func() error {
 		for range time.Tick(env.RefreshInterval) {
-			err = run(ctx, theFetcher, theState, detector, matchNotifier, env.StateSnapshotPath)
+			err = run(ctx, theFetcher, theState, detector, publisher, env.StateSnapshotPath)
 			if err != nil {
 				log.WithError(err).Warnf("Got an error while fetching the data. Keeping the old version instead of terminating here.")
 			}
@@ -138,7 +143,7 @@ func main() {
 	}
 }
 
-func run(ctx context.Context, f *fetcher, s *state, detector *changeDetector, matchNotifier notifier, snapshotPath string) error {
+func run(ctx context.Context, f *fetcher, s *state, detector *changeDetector, publisher *sqsPublisher, snapshotPath string) error {
 
 	err := f.fetch(ctx)
 	if err != nil {
@@ -233,11 +238,13 @@ func run(ctx context.Context, f *fetcher, s *state, detector *changeDetector, ma
 	s.groupPerTeam = groupPerTeam
 	s.lock.Unlock()
 
-	// Notification and snapshot failures never fail the poll; fresh data is already live.
+	// Publication and snapshot failures never fail the poll; fresh data is already live.
 	if changes := detector.diff(allGames, time.Now()); len(changes) > 0 {
 		fmt.Printf("Detected %d changed game(s)\n", len(changes))
-		if err := matchNotifier.notifyChanges(ctx, changes); err != nil {
-			fmt.Printf("Error sending change notification: %v\n", err)
+		if publisher != nil {
+			if err := publisher.publish(ctx, changes); err != nil {
+				fmt.Printf("Error publishing change notification: %v\n", err)
+			}
 		}
 	}
 	if err := saveSnapshot(snapshotPath, allGames); err != nil {

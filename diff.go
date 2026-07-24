@@ -17,9 +17,9 @@ const (
 
 // FieldChange describes one changed attribute of a game between two polls.
 type FieldChange struct {
-	Field string
-	Old   string
-	New   string
+	Field string `json:"field"`
+	Old   string `json:"old"`
+	New   string `json:"new"`
 }
 
 // GameChange describes all detected changes of one game. Game holds the

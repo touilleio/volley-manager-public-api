@@ -7,8 +7,10 @@ services:
       dockerfile: Dockerfile
     environment:
       - API_KEY
-      - TELEGRAM_BOT_TOKEN
-      - TELEGRAM_CHAT_ID
+      - SQS_QUEUE_URL
+      - AWS_REGION
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
     ports:
       - 8080:8080
     security_opt:

@@ -35,14 +35,38 @@ http://localhost:8080/
 # Match change notifications
 
 At every poll, the freshly fetched matches are compared with the previous state. When a managed
-match is moved (new date/time, new hall, home/away swap) or its status changes, a Telegram
-message is sent with the old and new values. Matches that changed while the application was
-stopped are detected on the first poll after a restart, thanks to a games snapshot stored in
-the `data` docker volume.
+match is moved (new date/time, new hall, home/away swap) or its status changes, a JSON payload is
+published to an AWS SQS queue. Matches that changed while the application was stopped are detected
+on the first poll after a restart, thanks to a games snapshot stored in the `data` docker volume.
 
-To enable it, create a bot with [@BotFather](https://t.me/BotFather), invite it to your
-group/chat, and set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in your `.env` file
-(see [.env-example](./.env-example)). When unset, moved matches are written to the application logs instead.
+The payload is formatting-independent; consumers own the rendering (Telegram message, email, ...):
+
+```json
+{
+  "version": 1,
+  "type": "volley.matches.changed",
+  "detectedAt": "2026-07-24T16:00:00+02:00",
+  "games": [
+    {
+      "gameId": 391647,
+      "playDate": "2025-09-21 15:00:00",
+      "homeTeam": "Gibloux Volley F1",
+      "awayTeam": "Volley Fribourg",
+      "league": "2L",
+      "hall": "Gymnase, Bulle",
+      "changes": [
+        {"field": "playDate", "old": "2025-09-20 17:00:00", "new": "2025-09-21 15:00:00"},
+        {"field": "hall", "old": "Salle du Collège, Fribourg", "new": "Gymnase, Bulle"}
+      ]
+    }
+  ]
+}
+```
+
+Set `SQS_QUEUE_URL` and the publisher credentials (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`,
+optionally `AWS_REGION`) in your `.env` file (see [.env-example](./.env-example)). The queue and the
+IAM users are created by the terraform setup in [deployment/](./deployment). When unset,
+notifications are disabled.
 
 # MCP server
 
