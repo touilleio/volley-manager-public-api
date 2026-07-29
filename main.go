@@ -24,7 +24,8 @@ var (
 type EnvConfig struct {
 	APIKey                 string        `envconfig:"API_KEY"`
 	RefreshInterval        time.Duration `envconfig:"REFRESH_INTERVAL" default:"1h"`
-	TeamsId                []int         `envconfig:"TEAMS_ID" default:""`
+	ClubID                 string        `envconfig:"CLUB_ID" default:""`
+	ExcludedTeamIDs        []int         `envconfig:"EXCLUDED_TEAMS_ID" default:""`
 	TeamCaptionReplacement []string      `envconfig:"TEAM_CAPTION_REPLACEMENT" default:""`
 	BindIP                 string        `envconfig:"BIND_IP" default:"0.0.0.0"`
 	Port                   string        `envconfig:"PORT" default:"8080"`
@@ -71,7 +72,7 @@ func main() {
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 
 	// The state where information are stored
-	theState := newState(env.TeamsId)
+	theState := newState(env.ClubID, env.ExcludedTeamIDs)
 
 	// Change notifications are published to SQS; without a queue URL they are disabled.
 	var publisher *sqsPublisher
@@ -165,7 +166,7 @@ func run(ctx context.Context, f *fetcher, s *state, detector *changeDetector, pu
 
 		isManaged := false
 
-		if s.isManagedTeam(game.Teams.Away.TeamId) {
+		if s.isManagedTeam(game.Teams.Away) {
 			teams[game.Teams.Away.TeamId] = game.Teams.Away
 			l, ok := leaguePerTeam[game.Teams.Away.TeamId]
 			if ok {
@@ -188,7 +189,7 @@ func run(ctx context.Context, f *fetcher, s *state, detector *changeDetector, pu
 			isManaged = true
 		}
 
-		if s.isManagedTeam(game.Teams.Home.TeamId) {
+		if s.isManagedTeam(game.Teams.Home) {
 			teams[game.Teams.Home.TeamId] = game.Teams.Home
 			l, ok := leaguePerTeam[game.Teams.Home.TeamId]
 			if ok {

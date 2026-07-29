@@ -18,6 +18,10 @@ Configure .env file base on [.env-example](./.env-example) file, and run the con
 docker compose up -d
 ```
 
+`CLUB_ID` selects every team belonging to that club (for example `906295`). Leave it empty to
+include all clubs. `EXCLUDED_TEAMS_ID` is an optional comma-separated list of individual team IDs
+to remove from the selection. The former `TEAMS_ID` allow-list is no longer supported.
+
 ## Build it
 
 All the sources are provided in this repo, if you're adventurous you can build it yourself.

@@ -20,7 +20,7 @@ var (
 )
 
 func seededState(games ...Game) *state {
-	s := newState(nil)
+	s := newState("", nil)
 	s.rawGames = games
 	return s
 }

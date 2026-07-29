@@ -19,10 +19,10 @@ func TestPollDiffPublishesToSqs(t *testing.T) {
 	var allGames []Game
 	assert.Nil(t, json.Unmarshal(raw, &allGames))
 
-	theState := newState([]int{6631})
+	theState := newState("906295", nil)
 	current := make([]Game, 0)
 	for _, game := range allGames {
-		if theState.isManagedTeam(game.Teams.Home.TeamId) || theState.isManagedTeam(game.Teams.Away.TeamId) {
+		if theState.isManagedTeam(game.Teams.Home) || theState.isManagedTeam(game.Teams.Away) {
 			current = append(current, game)
 		}
 	}
