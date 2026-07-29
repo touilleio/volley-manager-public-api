@@ -17,9 +17,9 @@ COPY . .
 
 RUN env GOOS=${TARGETOS} GOARCH=${TARGETARCH} CGO_ENABLED=0 \
     go build -o volley-manager-public-api \
-    -ldflags "-X github.com/sqooba/go-common/version.GitCommit=${GIT_COMMIT} \
-    			-X github.com/sqooba/go-common/version.BuildDate=${BUILD_DATE} \
-    			-X github.com/sqooba/go-common/version.Version=${VERSION}" \
+    -ldflags "-X github.com/touilleio/volley-manager-public-api/internal/buildinfo.GitCommit=${GIT_COMMIT} \
+			-X github.com/touilleio/volley-manager-public-api/internal/buildinfo.BuildDate=${BUILD_DATE} \
+			-X github.com/touilleio/volley-manager-public-api/internal/buildinfo.Version=${VERSION}" \
     .
 
 FROM --platform=$BUILDPLATFORM alpine:3.23
@@ -36,4 +36,3 @@ EXPOSE 8080
 
 COPY --from=builder /src/volley-manager-public-api .
 COPY ./static /static
-

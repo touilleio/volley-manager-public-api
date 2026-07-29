@@ -2,9 +2,9 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestReferees_UnmarshalJSON(t *testing.T) {
@@ -35,18 +35,17 @@ func TestReferees_UnmarshalJSON(t *testing.T) {
 	err := json.Unmarshal([]byte(jsonData), &games)
 	assert.Nil(t, err)
 	if err != nil {
-		fmt.Println("error:", err)
+		t.Log("error:", err)
 	}
 
 	for _, game := range games {
-		fmt.Printf("Game ID: %d\n", game.GameId)
+		t.Logf("Game ID: %d", game.GameId)
 		if len(game.Referees.Data) == 0 {
-			fmt.Println("No referees")
+			t.Log("No referees")
 		} else {
 			for key, referee := range game.Referees.Data {
-				fmt.Printf("Referee %s: %+v\n", key, referee)
+				t.Logf("Referee %s: %+v", key, referee)
 			}
 		}
-		fmt.Println()
 	}
 }

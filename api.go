@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -10,7 +11,6 @@ import (
 	ics "github.com/arran4/golang-ical"
 	"github.com/gin-gonic/gin"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -174,7 +174,7 @@ func (a api) run(address string, g *errgroup.Group) {
 	g.Go(func() error {
 		err := r.Run(address)
 		if err != nil {
-			log.WithError(err).Errorf("Got an error")
+			slog.Error("Got an error", "err", err)
 		}
 		return err
 	})

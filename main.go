@@ -5,14 +5,15 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
-	"github.com/sqooba/go-common/logging"
-	"github.com/sqooba/go-common/version"
+	"github.com/touilleio/volley-manager-public-api/internal/buildinfo"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -23,11 +24,11 @@ var (
 type EnvConfig struct {
 	APIKey                 string        `envconfig:"API_KEY"`
 	RefreshInterval        time.Duration `envconfig:"REFRESH_INTERVAL" default:"1h"`
-	TeamsId                []int         `envconfig:"TEAMS_ID" default:"6631,6632,6633,6634,6635,6636,7681,11902,12625,12855,13763,14019"`
-	TeamCaptionReplacement []string      `envconfig:"TEAM_CAPTION_REPLACEMENT" default:"Gibloux Volley:Gibloux Volley F1,Gibloux Volley F4 A:Gibloux Volley F4,Gibloux Volley F20A:Gibloux Volley F20"`
+	TeamsId                []int         `envconfig:"TEAMS_ID" default:""`
+	TeamCaptionReplacement []string      `envconfig:"TEAM_CAPTION_REPLACEMENT" default:""`
 	BindIP                 string        `envconfig:"BIND_IP" default:"0.0.0.0"`
 	Port                   string        `envconfig:"PORT" default:"8080"`
-	LogLevel               string        `envconfig:"LOG_LEVEL" default:"debug"`
+	LogLevel               string        `envconfig:"LOG_LEVEL" default:"info"`
 	MetricsNamespace       string        `envconfig:"METRICS_NAMESPACE" default:""`
 	MetricsSubsystem       string        `envconfig:"METRICS_SUBSYSTEM" default:""`
 	MetricsPath            string        `envconfig:"METRICS_PATH" default:"/metrics"`
@@ -38,29 +39,28 @@ type EnvConfig struct {
 
 func main() {
 
-	var log = logging.NewLogger()
+	var logLevel = new(slog.LevelVar)
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})))
 
-	log.Println("volley-manager-public-api application is starting...")
-	log.Printf("Version    : %s", version.Version)
-	log.Printf("Commit     : %s", version.GitCommit)
-	log.Printf("Build date : %s", version.BuildDate)
-	log.Printf("OSarch     : %s", version.OsArch)
+	slog.Info("volley-manager-public-api application is starting...",
+		"version", buildinfo.Version,
+		"commit", buildinfo.GitCommit,
+		"buildDate", buildinfo.BuildDate,
+		"osArch", buildinfo.OSArch,
+	)
 
 	var env EnvConfig
 	if err := envconfig.Process("", &env); err != nil {
-		log.Errorf("Failed to process env var: %s", err)
+		slog.Error("Failed to process env var", "err", err)
 		return
 	}
 
 	flag.Parse()
-	err := logging.SetLogLevel(log, env.LogLevel)
-	if err != nil {
-		log.Errorf("Logging level %s do not seem to be right. Err = %v", env.LogLevel, err)
-		return
-	}
+	logLevel.Set(parseLogLevel(env.LogLevel))
 
 	if *setLogLevel != "" {
-		logging.SetRemoteLogLevelAndExit(log, env.Port, *setLogLevel)
+		logLevel.Set(parseLogLevel(*setLogLevel))
+		slog.Info("Log level changed", "level", *setLogLevel)
 	}
 
 	// errgroup will coordinate the many routines handling the API.
@@ -76,13 +76,14 @@ func main() {
 	// Change notifications are published to SQS; without a queue URL they are disabled.
 	var publisher *sqsPublisher
 	if env.SqsQueueURL != "" {
-		publisher, err = newSqsPublisher(cancellableCtx, env.SqsQueueURL, env.AwsRegion)
+		p, err := newSqsPublisher(cancellableCtx, env.SqsQueueURL, env.AwsRegion)
 		if err != nil {
-			log.WithError(err).Error("Got an error while instantiating the SQS publisher")
+			slog.Error("Got an error while instantiating the SQS publisher", "err", err)
 			return
 		}
+		publisher = p
 	} else {
-		log.Println("SQS_QUEUE_URL is not set, match change notifications are disabled")
+		slog.Info("SQS_QUEUE_URL is not set, match change notifications are disabled")
 	}
 
 	// The change detector is primed with the snapshot of the previous run, so
@@ -91,21 +92,21 @@ func main() {
 	// the first poll establishes a fresh baseline without notifying.
 	previousGames, err := loadSnapshot(env.StateSnapshotPath)
 	if err != nil {
-		log.WithError(err).Warnf("Could not load games snapshot %s, starting with a fresh baseline", env.StateSnapshotPath)
+		slog.Warn("Could not load games snapshot, starting with a fresh baseline", "path", env.StateSnapshotPath, "err", err)
 	}
 	detector := newChangeDetector(previousGames)
 
 	// The fetcher will poll the Volley Manager API at a given rate
 	theFetcher, err := newFetcher(env.APIKey, theState)
 	if err != nil {
-		log.WithError(err).Error("Got an error while instantiating the fetcher")
+		slog.Error("Got an error while instantiating the fetcher", "err", err)
 		return
 	}
 
 	// First fetch must complete
 	err = run(cancellableCtx, theFetcher, theState, detector, publisher, env.StateSnapshotPath)
 	if err != nil {
-		log.WithError(err).Error("Got an error while fetching the data for the first time")
+		slog.Error("Got an error while fetching the data for the first time", "err", err)
 		return
 	}
 
@@ -114,7 +115,7 @@ func main() {
 		for range time.Tick(env.RefreshInterval) {
 			err = run(ctx, theFetcher, theState, detector, publisher, env.StateSnapshotPath)
 			if err != nil {
-				log.WithError(err).Warnf("Got an error while fetching the data. Keeping the old version instead of terminating here.")
+				slog.Warn("Got an error while fetching the data. Keeping the old version instead of terminating here.", "err", err)
 			}
 		}
 		return nil
@@ -127,11 +128,11 @@ func main() {
 	// Wait for any shutdown
 	select {
 	case <-signalChan:
-		log.Info("Shutdown signal received, exiting...")
+		slog.Info("Shutdown signal received, exiting...")
 		cancel()
 		break
 	case <-ctx.Done():
-		log.Info("Group context is done, exiting...")
+		slog.Info("Group context is done, exiting...")
 		cancel()
 		break
 	}
@@ -139,7 +140,8 @@ func main() {
 	// if a non-clean shutdown was triggered, details are printed here
 	err = ctx.Err()
 	if err != nil && !errors.Is(err, context.Canceled) {
-		log.Fatalf("Got an error from the error group context: %v", err)
+		slog.Error("Got an error from the error group context", "err", err)
+		os.Exit(1)
 	}
 }
 
@@ -168,7 +170,7 @@ func run(ctx context.Context, f *fetcher, s *state, detector *changeDetector, pu
 			l, ok := leaguePerTeam[game.Teams.Away.TeamId]
 			if ok {
 				if l.LeagueId != game.League.LeagueId {
-					fmt.Printf("League mismatch for team %s: previous %s current %s\n", game.Teams.Away.Caption, l.Caption, game.League.Caption)
+					slog.Warn("League mismatch for team", "team", game.Teams.Away.Caption, "previous", l.Caption, "current", game.League.Caption)
 				}
 			} else {
 				leaguePerTeam[game.Teams.Away.TeamId] = game.League
@@ -176,7 +178,7 @@ func run(ctx context.Context, f *fetcher, s *state, detector *changeDetector, pu
 			g, ok := groupPerTeam[game.Teams.Away.TeamId]
 			if ok {
 				if g.GroupId != game.Group.GroupId {
-					fmt.Printf("Group mismatch for team %s: previous %s current %s\n", game.Teams.Away.Caption, g.Caption, game.Group.Caption)
+					slog.Warn("Group mismatch for team", "team", game.Teams.Away.Caption, "previous", g.Caption, "current", game.Group.Caption)
 				}
 			} else {
 				groupPerTeam[game.Teams.Away.TeamId] = game.Group
@@ -191,7 +193,7 @@ func run(ctx context.Context, f *fetcher, s *state, detector *changeDetector, pu
 			l, ok := leaguePerTeam[game.Teams.Home.TeamId]
 			if ok {
 				if l.LeagueId != game.League.LeagueId {
-					fmt.Printf("League mismatch for team %s: previous %s current %s\n", game.Teams.Home.Caption, l.Caption, game.League.Caption)
+					slog.Warn("League mismatch for team", "team", game.Teams.Home.Caption, "previous", l.Caption, "current", game.League.Caption)
 				}
 			} else {
 				leaguePerTeam[game.Teams.Home.TeamId] = game.League
@@ -199,7 +201,7 @@ func run(ctx context.Context, f *fetcher, s *state, detector *changeDetector, pu
 			gr, ok := groupPerTeam[game.Teams.Home.TeamId]
 			if ok {
 				if gr.GroupId != game.Group.GroupId {
-					fmt.Printf("Group mismatch for team %s: previous %s current %s\n", game.Teams.Home.Caption, gr.Caption, game.Group.Caption)
+					slog.Warn("Group mismatch for team", "team", game.Teams.Home.Caption, "previous", gr.Caption, "current", game.Group.Caption)
 				}
 			} else {
 				groupPerTeam[game.Teams.Home.TeamId] = game.Group
@@ -223,8 +225,8 @@ func run(ctx context.Context, f *fetcher, s *state, detector *changeDetector, pu
 						ranking.Ranking[i] = t
 					}
 				}
-				fmt.Printf("Team %s is in this %d, %d, %d, #ranking %d\n", teams[teamId].Caption, ranking.LeagueId, ranking.PhaseId, ranking.GroupId, len(ranking.Ranking))
-				fmt.Printf("Ranking is %v\n", ranking)
+				slog.Debug("Team is in this ranking", "team", teams[teamId].Caption, "leagueId", ranking.LeagueId, "phaseId", ranking.PhaseId, "groupId", ranking.GroupId, "rankingSize", len(ranking.Ranking))
+				slog.Debug("Ranking detail", "ranking", ranking)
 			}
 		}
 	}
@@ -240,16 +242,33 @@ func run(ctx context.Context, f *fetcher, s *state, detector *changeDetector, pu
 
 	// Publication and snapshot failures never fail the poll; fresh data is already live.
 	if changes := detector.diff(allGames, time.Now()); len(changes) > 0 {
-		fmt.Printf("Detected %d changed game(s)\n", len(changes))
+		slog.Info("Detected changed game(s)", "count", len(changes))
 		if publisher != nil {
 			if err := publisher.publish(ctx, changes); err != nil {
-				fmt.Printf("Error publishing change notification: %v\n", err)
+				slog.Warn("Error publishing change notification", "err", err)
 			}
 		}
 	}
 	if err := saveSnapshot(snapshotPath, allGames); err != nil {
-		fmt.Printf("Error saving games snapshot: %v\n", err)
+		slog.Warn("Error saving games snapshot", "err", err)
 	}
 
 	return nil
+}
+
+// parseLogLevel also accepts the previous logger's level names (trace/fatal/panic).
+func parseLogLevel(level string) slog.Level {
+	switch strings.ToLower(level) {
+	case "trace", "debug":
+		return slog.LevelDebug
+	case "info":
+		return slog.LevelInfo
+	case "warn", "warning":
+		return slog.LevelWarn
+	case "error", "fatal", "panic":
+		return slog.LevelError
+	default:
+		slog.Warn("Unknown log level, falling back to info", "level", level)
+		return slog.LevelInfo
+	}
 }

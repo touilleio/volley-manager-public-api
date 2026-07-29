@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/sqooba/go-common/version"
+	"github.com/touilleio/volley-manager-public-api/internal/buildinfo"
 )
 
 type matchesOutput struct {
@@ -17,7 +17,7 @@ type noInput struct{}
 func newMcpServer(s *state, location *time.Location, teamCaptionReplacement map[string]string) *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "volley-manager-public-api",
-		Version: version.Version,
+		Version: buildinfo.Version,
 	}, nil)
 
 	mcp.AddTool(server, &mcp.Tool{

@@ -1,6 +1,6 @@
 services:
   public-api:
-    image: touilleio/volley-manager-public-api:v2.0.0
+    image: touilleio/volley-manager-public-api:v2.1.0-rc4
     restart: unless-stopped
     build:
       context: .

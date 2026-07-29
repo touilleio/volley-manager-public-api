@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -48,57 +47,47 @@ func (f fetcher) fetch(ctx context.Context) error {
 	// Fetch rawGames collection
 	req, err := http.NewRequestWithContext(ctx, "GET", gamesCollectionUri, nil)
 	if err != nil {
-		fmt.Printf("Error creating request: %v\n", err)
-		return err
+		return fmt.Errorf("creating games request: %w", err)
 	}
 
 	req.Header.Set("Authorization", f.apiKey)
 	resp, err := f.httpClient.Do(req)
 	if err != nil {
-		fmt.Printf("Error making request: %v\n", err)
-		return err
+		return fmt.Errorf("fetching games: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Printf("Error reading response body: %v\n", err)
-		return err
+		return fmt.Errorf("reading games response body: %w", err)
 	}
 
 	var games []Game
 	if err := json.Unmarshal(body, &games); err != nil {
-		fmt.Printf("Body: %v\n", bytes.NewBuffer(body).String())
-		fmt.Printf("Error unmarshalling games response: %v\n", err)
-		return err
+		return fmt.Errorf("unmarshalling games response: %w (body: %.512s)", err, string(body))
 	}
 
 	// Fetch the rawRankings
 	req, err = http.NewRequestWithContext(ctx, "GET", clubRankingsUri, nil)
 	if err != nil {
-		fmt.Printf("Error creating request: %v\n", err)
-		return err
+		return fmt.Errorf("creating rankings request: %w", err)
 	}
 
 	req.Header.Set("Authorization", f.apiKey)
 	resp, err = f.httpClient.Do(req)
 	if err != nil {
-		fmt.Printf("Error making request: %v\n", err)
-		return err
+		return fmt.Errorf("fetching rankings: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err = io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Printf("Error reading response body: %v\n", err)
-		return err
+		return fmt.Errorf("reading rankings response body: %w", err)
 	}
 
 	var rankings []GroupRankings
 	if err := json.Unmarshal(body, &rankings); err != nil {
-		fmt.Printf("Body: %v\n", bytes.NewBuffer(body).String())
-		fmt.Printf("Error unmarshalling rankings response: %v\n", err)
-		return err
+		return fmt.Errorf("unmarshalling rankings response: %w (body: %.512s)", err, string(body))
 	}
 
 	f.state.rawGames = games

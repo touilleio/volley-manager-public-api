@@ -1,0 +1,5 @@
+# Copy to terraform.tfvars and adjust.
+aws_region  = "eu-central-1"
+aws_profile = "admin" # your existing profile with sufficient rights to create IAM users
+project     = "volley-manager"
+queue_name  = "volley-manager-notifications" # must match deployment/terraform.tfvars

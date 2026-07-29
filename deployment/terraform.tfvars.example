@@ -1,0 +1,5 @@
+# Copy to terraform.tfvars and adjust.
+aws_region  = "eu-central-1" # Frankfurt; eu-central-2 (Zurich) requires enabling the opt-in region on the account
+aws_profile = "registry"     # any profile from ~/.aws/credentials; omit to use AWS_PROFILE/default chain
+project     = "volley-manager"
+queue_name  = "volley-manager-notifications"
