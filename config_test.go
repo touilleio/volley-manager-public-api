@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"testing"
 
 	"github.com/kelseyhightower/envconfig"
@@ -25,4 +26,28 @@ func TestEnvConfigAllowsEmptyClubSelection(t *testing.T) {
 	require.NoError(t, envconfig.Process("", &env))
 	require.Empty(t, env.ClubID)
 	require.Empty(t, env.ExcludedTeamIDs)
+}
+
+func TestEnvConfigUsesDefaultCupLeagueCategoryIDs(t *testing.T) {
+	previousValue, wasSet := os.LookupEnv("CUP_LEAGUE_CATEGORY_IDS")
+	require.NoError(t, os.Unsetenv("CUP_LEAGUE_CATEGORY_IDS"))
+	t.Cleanup(func() {
+		if wasSet {
+			require.NoError(t, os.Setenv("CUP_LEAGUE_CATEGORY_IDS", previousValue))
+			return
+		}
+		require.NoError(t, os.Unsetenv("CUP_LEAGUE_CATEGORY_IDS"))
+	})
+
+	var env EnvConfig
+	require.NoError(t, envconfig.Process("", &env))
+	require.Equal(t, []int{4}, env.CupLeagueCategoryIDs)
+}
+
+func TestEnvConfigParsesCupLeagueCategoryIDs(t *testing.T) {
+	t.Setenv("CUP_LEAGUE_CATEGORY_IDS", "4,8")
+
+	var env EnvConfig
+	require.NoError(t, envconfig.Process("", &env))
+	require.Equal(t, []int{4, 8}, env.CupLeagueCategoryIDs)
 }

@@ -4,6 +4,24 @@ function capitalizeFirstLetter(string) {
     return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
+function escapeHtml(value) {
+	return $('<div>').text(value == null ? '' : value).html();
+}
+
+function renderLeagueCell(data, type, row) {
+	if (type !== 'display' || !row || row.isCup !== true) {
+		return data;
+	}
+
+	return '<span class="league-cell"><span class="league-cell-text">' + escapeHtml(data) + '</span><span class="league-cup-indicator"><span data-feather="award" class="league-cup-icon" aria-hidden="true"></span><span class="league-cup-label">Coupe</span></span></span>';
+}
+
+function replaceFeatherIcons() {
+	if (window.feather) {
+		feather.replace();
+	}
+}
+
 $( document ).ready(function() {
 	
 	$('.page_menu a').each(function(e) {
@@ -61,14 +79,17 @@ $( document ).ready(function() {
 				},{
 					data: 'awayTeam'
 				},{
-					data: 'phase'
+					data: 'phase',
+					render: renderLeagueCell
 				},{
 					data: 'hall'
 				}
 			],
 			dom: 'Bfrtip',
-			select: false
+			select: false,
+			drawCallback: replaceFeatherIcons
 		});
+		oTable.on('responsive-display.dt', replaceFeatherIcons);
 		
 		// Filter results on select change
 		$('#sel_team_id').on('change', function () {

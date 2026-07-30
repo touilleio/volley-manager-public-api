@@ -5,3 +5,27 @@
 .demo-html-visible {
 	visibility: visible;
 }
+
+@media screen and (max-width: 375px) {
+	#rakning.dataTable.nowrap th.all,
+	#rakning.dataTable.nowrap td.all {
+		white-space: normal;
+	}
+
+	#rakning.dataTable thead > tr > th.all.sorting,
+	#rakning.dataTable thead > tr > th.all.sorting_asc,
+	#rakning.dataTable thead > tr > th.all.sorting_desc,
+	#rakning.dataTable tbody td.all {
+		padding-left: 6px;
+		padding-right: 18px;
+	}
+
+	#rakning.dataTable.dtr-inline.collapsed > tbody > tr > td.dtr-control.all {
+		padding-left: 24px;
+	}
+
+	#rakning.dataTable th.all:nth-child(2),
+	#rakning.dataTable td.all:nth-child(2) {
+		overflow-wrap: anywhere;
+	}
+}

@@ -26,6 +26,7 @@ type EnvConfig struct {
 	RefreshInterval        time.Duration `envconfig:"REFRESH_INTERVAL" default:"1h"`
 	ClubID                 string        `envconfig:"CLUB_ID" default:""`
 	ExcludedTeamIDs        []int         `envconfig:"EXCLUDED_TEAMS_ID" default:""`
+	CupLeagueCategoryIDs   []int         `envconfig:"CUP_LEAGUE_CATEGORY_IDS" default:"4"`
 	TeamCaptionReplacement []string      `envconfig:"TEAM_CAPTION_REPLACEMENT" default:""`
 	BindIP                 string        `envconfig:"BIND_IP" default:"0.0.0.0"`
 	Port                   string        `envconfig:"PORT" default:"8080"`
@@ -72,7 +73,7 @@ func main() {
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 
 	// The state where information are stored
-	theState := newState(env.ClubID, env.ExcludedTeamIDs)
+	theState := newState(env.ClubID, env.ExcludedTeamIDs, env.CupLeagueCategoryIDs)
 
 	// Change notifications are published to SQS; without a queue URL they are disabled.
 	var publisher *sqsPublisher
@@ -153,93 +154,9 @@ func run(ctx context.Context, f *fetcher, s *state, detector *changeDetector, pu
 		return err
 	}
 
-	allGames := make([]Game, 0, len(s.rawGames))
-	teams := make(map[int]Team)
-	gamesPerTeam := make(map[int][]Game)
-	rankingPerTeam := make(map[int]GroupRankings)
-	leagues := make(map[int]string)
-	leaguePerTeam := make(map[int]League)
-	groupPerTeam := make(map[int]Group)
+	allGames := s.rebuildManagedGames()
 
-	for _, game := range s.rawGames {
-		leagues[game.League.LeagueId] = game.League.Translations.F
-
-		isManaged := false
-
-		if s.isManagedTeam(game.Teams.Away) {
-			teams[game.Teams.Away.TeamId] = game.Teams.Away
-			l, ok := leaguePerTeam[game.Teams.Away.TeamId]
-			if ok {
-				if l.LeagueId != game.League.LeagueId {
-					slog.Warn("League mismatch for team", "team", game.Teams.Away.Caption, "previous", l.Caption, "current", game.League.Caption)
-				}
-			} else {
-				leaguePerTeam[game.Teams.Away.TeamId] = game.League
-			}
-			g, ok := groupPerTeam[game.Teams.Away.TeamId]
-			if ok {
-				if g.GroupId != game.Group.GroupId {
-					slog.Warn("Group mismatch for team", "team", game.Teams.Away.Caption, "previous", g.Caption, "current", game.Group.Caption)
-				}
-			} else {
-				groupPerTeam[game.Teams.Away.TeamId] = game.Group
-			}
-			t := gamesPerTeam[game.Teams.Away.TeamId]
-			gamesPerTeam[game.Teams.Away.TeamId] = append(t, game)
-			isManaged = true
-		}
-
-		if s.isManagedTeam(game.Teams.Home) {
-			teams[game.Teams.Home.TeamId] = game.Teams.Home
-			l, ok := leaguePerTeam[game.Teams.Home.TeamId]
-			if ok {
-				if l.LeagueId != game.League.LeagueId {
-					slog.Warn("League mismatch for team", "team", game.Teams.Home.Caption, "previous", l.Caption, "current", game.League.Caption)
-				}
-			} else {
-				leaguePerTeam[game.Teams.Home.TeamId] = game.League
-			}
-			gr, ok := groupPerTeam[game.Teams.Home.TeamId]
-			if ok {
-				if gr.GroupId != game.Group.GroupId {
-					slog.Warn("Group mismatch for team", "team", game.Teams.Home.Caption, "previous", gr.Caption, "current", game.Group.Caption)
-				}
-			} else {
-				groupPerTeam[game.Teams.Home.TeamId] = game.Group
-			}
-			t := gamesPerTeam[game.Teams.Home.TeamId]
-			gamesPerTeam[game.Teams.Home.TeamId] = append(t, game)
-			isManaged = true
-		}
-		if isManaged {
-			allGames = append(allGames, game)
-		}
-	}
-
-	for _, ranking := range s.rawRankings {
-		for teamId, group := range groupPerTeam {
-			if group.GroupId == ranking.GroupId {
-				rankingPerTeam[teams[teamId].TeamId] = ranking
-				for i, t := range ranking.Ranking {
-					if t.TeamId == teamId {
-						t.IsTeam = true
-						ranking.Ranking[i] = t
-					}
-				}
-				slog.Debug("Team is in this ranking", "team", teams[teamId].Caption, "leagueId", ranking.LeagueId, "phaseId", ranking.PhaseId, "groupId", ranking.GroupId, "rankingSize", len(ranking.Ranking))
-				slog.Debug("Ranking detail", "ranking", ranking)
-			}
-		}
-	}
-
-	s.lock.Lock()
-	s.rawGames = allGames
-	s.teams = teams
-	s.gamesPerTeam = gamesPerTeam
-	s.rankingPerTeam = rankingPerTeam
-	s.leaguePerTeam = leaguePerTeam
-	s.groupPerTeam = groupPerTeam
-	s.lock.Unlock()
+	slog.Info("Pulled", "games", len(s.rawGames), "teams", len(s.teams))
 
 	// Publication and snapshot failures never fail the poll; fresh data is already live.
 	if changes := detector.diff(allGames, time.Now()); len(changes) > 0 {

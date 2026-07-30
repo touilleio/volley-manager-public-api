@@ -9,6 +9,7 @@ services:
       - API_KEY
       - CLUB_ID
       - EXCLUDED_TEAMS_ID
+      - CUP_LEAGUE_CATEGORY_IDS
       - SQS_QUEUE_URL
       - AWS_REGION
       - AWS_ACCESS_KEY_ID

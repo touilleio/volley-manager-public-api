@@ -20,7 +20,7 @@ var (
 )
 
 func seededState(games ...Game) *state {
-	s := newState("", nil)
+	s := newState("", nil, nil)
 	s.rawGames = games
 	return s
 }
@@ -37,7 +37,8 @@ func TestNextWeekMatches(t *testing.T) {
 	thisWeek := gameAt("2026-01-17 18:30:00")
 	farAway := gameAt("2026-02-10 20:00:00")
 
-	output := nextWeekMatches(seededState(next, thisWeek, farAway), mcpNow, mcpLocation, map[string]string{})
+	s := seededState(next, thisWeek, farAway)
+	output := nextWeekMatches(s, mcpNow, newGamePresenter(mcpLocation, map[string]string{}, s.isCup))
 
 	if assert.Len(t, output.Matches, 1) {
 		assert.Equal(t, "2026-01-20 18:30:00", output.Matches[0].PlayDate)
@@ -48,8 +49,9 @@ func TestNextWeekMatches(t *testing.T) {
 func TestNextWeekMatches_AppliesCaptionReplacement(t *testing.T) {
 	next := gameAt("2026-01-20 18:30:00")
 
-	output := nextWeekMatches(seededState(next), mcpNow, mcpLocation,
-		map[string]string{"Gibloux Volley F1": "F1"})
+	s := seededState(next)
+	output := nextWeekMatches(s, mcpNow,
+		newGamePresenter(mcpLocation, map[string]string{"Gibloux Volley F1": "F1"}, s.isCup))
 
 	if assert.Len(t, output.Matches, 1) {
 		assert.Equal(t, "F1", output.Matches[0].HomeTeam)
@@ -61,7 +63,8 @@ func TestCurrentWeekResults(t *testing.T) {
 	upcoming := gameAt("2026-01-17 18:30:00")
 	lastWeek := withResult(gameAt("2026-01-11 20:00:00"), "away", 1, 3)
 
-	output := currentWeekResults(seededState(played, upcoming, lastWeek), mcpNow, mcpLocation, map[string]string{})
+	s := seededState(played, upcoming, lastWeek)
+	output := currentWeekResults(s, mcpNow, newGamePresenter(mcpLocation, map[string]string{}, s.isCup))
 
 	if assert.Len(t, output.Matches, 1) {
 		assert.Equal(t, "home", output.Matches[0].Winner)
@@ -73,7 +76,8 @@ func TestCurrentWeekResults(t *testing.T) {
 // Verifies the whole MCP stack end to end: the streamable HTTP transport
 // answers an initialize handshake with this server's identity.
 func TestMcpServerInitialize(t *testing.T) {
-	server := newMcpServer(seededState(), mcpLocation, map[string]string{})
+	s := seededState()
+	server := newMcpServer(s, newGamePresenter(mcpLocation, map[string]string{}, s.isCup))
 	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
 		return server
 	}, &mcp.StreamableHTTPOptions{JSONResponse: true})
