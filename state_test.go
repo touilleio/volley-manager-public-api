@@ -140,14 +140,14 @@ func TestStateRebuildKeepsCupGamesOutOfCompetitionMetadata(t *testing.T) {
 		Group:  Group{GroupId: 100, Caption: "Cup group"},
 	}
 	s := newState("club", nil, []int{4})
-	s.rawGames = []Game{cupGame, leagueGame, cupOnlyGame}
-	s.rawRankings = []GroupRankings{
+	games := []Game{cupGame, leagueGame, cupOnlyGame}
+	rankings := []GroupRankings{
 		{GroupId: 100, Ranking: []TeamRanking{{TeamId: leagueTeam.TeamId}}},
 		{GroupId: 200, Ranking: []TeamRanking{{TeamId: leagueTeam.TeamId}}},
 		{GroupId: 100, Ranking: []TeamRanking{{TeamId: cupOnlyTeam.TeamId}}},
 	}
 
-	allGames := s.rebuildManagedGames()
+	allGames := s.rebuildManagedGames(games, rankings)
 
 	assert.Len(t, allGames, 3)
 	assert.Len(t, s.rawGames, 3)

@@ -1,15 +1,17 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -48,7 +50,28 @@ const (
 	timezone         = "Europe/Zurich"
 )
 
+const (
+	readHeaderTimeout = 5 * time.Second
+	readTimeout       = 15 * time.Second
+	writeTimeout      = 30 * time.Second
+	idleTimeout       = 60 * time.Second
+	shutdownTimeout   = 10 * time.Second
+)
+
+// teamIDParam parses the route parameter once and answers with a generic
+// client error: internal parse details are never reflected to callers.
+func teamIDParam(c *gin.Context) (int, bool) {
+	teamID, err := strconv.Atoi(c.Param("teamid"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid team id"})
+		return 0, false
+	}
+	return teamID, true
+}
+
 func (a *api) upcomingGames(c *gin.Context) {
+	a.state.lock.RLock()
+	defer a.state.lock.RUnlock()
 	gamesPublic := a.presenter().toUpcomingGamesPublic(a.state.rawGames)
 	c.JSON(http.StatusOK, gamesPublic)
 }
@@ -56,35 +79,35 @@ func (a *api) upcomingGames(c *gin.Context) {
 func (a *api) teamUpcomingGames(c *gin.Context) {
 	a.state.lock.RLock()
 	defer a.state.lock.RUnlock()
-	teamIdStr := c.Param("teamid")
-	teamId, err := strconv.Atoi(teamIdStr)
-	if err != nil {
-		c.String(http.StatusBadRequest, "Invalid teamId %s, err = %s", teamIdStr, err.Error())
+	teamID, ok := teamIDParam(c)
+	if !ok {
 		return
 	}
-	gamesPublic := a.presenter().toUpcomingGamesPublic(a.state.gamesPerTeam[teamId])
+	gamesPublic := a.presenter().toUpcomingGamesPublic(a.state.gamesPerTeam[teamID])
 	c.JSON(http.StatusOK, gamesPublic)
 }
+
+var filenameSanitizer = strings.NewReplacer("\r", "", "\n", "", `"`, "'")
 
 func (a *api) teamUpcomingGamesICS(c *gin.Context) {
 	a.state.lock.RLock()
 	defer a.state.lock.RUnlock()
-	teamIdStr := c.Param("teamid")
-	teamId, err := strconv.Atoi(teamIdStr)
-	if err != nil {
-		c.String(http.StatusBadRequest, "Invalid teamId %s, err = %s", teamIdStr, err.Error())
+	teamID, ok := teamIDParam(c)
+	if !ok {
 		return
 	}
-	upcomingGames := getUpcomingGames(a.state.gamesPerTeam[teamId], a.location)
+	upcomingGames := getUpcomingGames(a.state.gamesPerTeam[teamID], a.location)
 	icsEncoded := a.presenter().toIcal(upcomingGames)
 
-	if team, ok := a.state.teams[teamId]; ok {
-		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", team.Caption))
+	if team, ok := a.state.teams[teamID]; ok {
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filenameSanitizer.Replace(team.Caption)))
 	}
 	c.Data(http.StatusOK, "text/calendar", []byte(icsEncoded))
 }
 
 func (a *api) pastGames(c *gin.Context) {
+	a.state.lock.RLock()
+	defer a.state.lock.RUnlock()
 	gamesPublic := a.presenter().toPastGamesPublic(a.state.rawGames)
 	c.JSON(http.StatusOK, gamesPublic)
 }
@@ -92,26 +115,22 @@ func (a *api) pastGames(c *gin.Context) {
 func (a *api) teamPastGames(c *gin.Context) {
 	a.state.lock.RLock()
 	defer a.state.lock.RUnlock()
-	teamIdStr := c.Param("teamid")
-	teamId, err := strconv.Atoi(teamIdStr)
-	if err != nil {
-		c.String(http.StatusBadRequest, "Invalid teamId %s, err = %s", teamIdStr, err.Error())
+	teamID, ok := teamIDParam(c)
+	if !ok {
 		return
 	}
-	gamesPublic := a.presenter().toPastGamesPublic(a.state.gamesPerTeam[teamId])
+	gamesPublic := a.presenter().toPastGamesPublic(a.state.gamesPerTeam[teamID])
 	c.JSON(http.StatusOK, gamesPublic)
 }
 
 func (a *api) teamRanking(c *gin.Context) {
 	a.state.lock.RLock()
 	defer a.state.lock.RUnlock()
-	teamIdStr := c.Param("teamid")
-	teamId, err := strconv.Atoi(teamIdStr)
-	if err != nil {
-		c.String(http.StatusBadRequest, "Invalid teamId %s, err = %s", teamIdStr, err.Error())
+	teamID, ok := teamIDParam(c)
+	if !ok {
 		return
 	}
-	rankings := a.state.rankingPerTeam[teamId]
+	rankings := a.state.rankingPerTeam[teamID]
 
 	dedupTeamRanking := make([]TeamRanking, 0, len(rankings.Ranking))
 	teams := make(map[string]bool)
@@ -143,9 +162,24 @@ func (a *api) teams(c *gin.Context) {
 	c.JSON(http.StatusOK, teams)
 }
 
-func (a api) run(address string, g *errgroup.Group) {
+// securityHeaders applies the response headers that are safe for an embeddable
+// read-only API. CSP and frame rules are deployment-specific and documented in
+// the README instead of being forced here.
+func securityHeaders(c *gin.Context) {
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
+	c.Next()
+}
 
-	r := gin.Default()
+func (a *api) router() *gin.Engine {
+	r := gin.New()
+	r.Use(gin.Logger(), gin.Recovery(), securityHeaders)
+	// Proxy headers (X-Forwarded-For) are attacker-controlled unless a
+	// deployment explicitly trusts its reverse proxies; trust none by default.
+	if err := r.SetTrustedProxies(nil); err != nil {
+		panic(fmt.Errorf("disabling trusted proxies: %w", err))
+	}
+
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "pong",
@@ -164,18 +198,44 @@ func (a api) run(address string, g *errgroup.Group) {
 		c.Redirect(http.StatusMovedPermanently, "/static")
 	})
 
-	mcpServer := newMcpServer(a.state, a.presenter())
-	mcpHandler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
-		return mcpServer
-	}, &mcp.StreamableHTTPOptions{JSONResponse: true})
-	r.Any("/mcp", gin.WrapH(mcpHandler))
+	r.Any("/mcp", gin.WrapH(newMcpHandler(a.state, a.presenter())))
+	return r
+}
+
+func (a *api) newHTTPServer(address string) *http.Server {
+	return &http.Server{
+		Addr:              address,
+		Handler:           a.router(),
+		ReadHeaderTimeout: readHeaderTimeout,
+		ReadTimeout:       readTimeout,
+		WriteTimeout:      writeTimeout,
+		IdleTimeout:       idleTimeout,
+	}
+}
+
+func (a *api) run(address string, ctx context.Context, g *errgroup.Group) {
+	if os.Getenv("GIN_MODE") == "" {
+		gin.SetMode(gin.ReleaseMode)
+	}
+	server := a.newHTTPServer(address)
 
 	g.Go(func() error {
-		err := r.Run(address)
-		if err != nil {
-			slog.Error("Got an error", "err", err)
+		err := server.ListenAndServe()
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
 		}
 		return err
+	})
+
+	g.Go(func() error {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			slog.Error("Got an error while shutting down the HTTP server", "err", err)
+			return err
+		}
+		return nil
 	})
 }
 

@@ -40,6 +40,34 @@ Open your browser at:
 
 http://localhost:8080/
 
+# Security and production deployment
+
+This service is a **public, read-only API**: `/upcoming`, `/past`, `/ranking`, `/teams`, the
+calendar download, and the MCP endpoint intentionally require no authentication. Deploy it only
+with data you are comfortable publishing, and never expose the upstream `API_KEY` (it is used
+server-side only and never returned in responses).
+
+The Gin server is hardened for production out of the box:
+
+- **Release mode**: the binary defaults to `GIN_MODE=release` (set `GIN_MODE` explicitly to
+  override). Release mode disables Gin's debug logging and route warnings.
+- **Timeouts**: the `http.Server` sets `ReadHeaderTimeout` (5s), `ReadTimeout` (15s),
+  `WriteTimeout` (30s), and `IdleTimeout` (60s) to bound slow-client (Slowloris-style) attacks.
+- **Graceful shutdown**: `SIGINT`/`SIGTERM` drains in-flight requests with a 10s deadline.
+- **Trusted proxies**: none are trusted by default, so `X-Forwarded-For` cannot be spoofed.
+  If you run behind a reverse proxy, terminate TLS there and — only if you need real client IPs —
+  set trusted proxies explicitly in code to your proxy addresses.
+- **Security headers**: `X-Content-Type-Options: nosniff` and `Referrer-Policy` are set on every
+  response. Content-Security-Policy and frame rules are deployment-specific (the static pages use
+  CDN assets and the UI may be embedded); configure them at your reverse proxy if needed.
+- **MCP endpoint**: `/mcp` runs statelessly, so clients cannot accumulate server-side sessions.
+- **TLS**: the container serves plain HTTP on port 8080. Put a TLS-terminating reverse proxy
+  (nginx, Traefik, Caddy, cloud load balancer) in front for any non-localhost deployment.
+
+Keep secrets out of the image build: `.dockerignore` excludes `.env`, Terraform state and cache,
+game snapshots, and `.git` from the build context. Rotate credentials if a build context or
+builder cache containing them ever left your workstation.
+
 # Match change notifications
 
 At every poll, the freshly fetched matches are compared with the previous state. When a managed

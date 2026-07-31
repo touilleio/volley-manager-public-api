@@ -2,11 +2,22 @@ package main
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/touilleio/volley-manager-public-api/internal/buildinfo"
 )
+
+// newMcpHandler serves the read-only tools statelessly: without
+// Stateless, every unauthenticated initialize is retained in memory until
+// process exit, which is an unbounded resource-exhaustion vector.
+func newMcpHandler(s *state, presenter gamePresenter) http.Handler {
+	server := newMcpServer(s, presenter)
+	return mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
+		return server
+	}, &mcp.StreamableHTTPOptions{JSONResponse: true, Stateless: true})
+}
 
 type matchesOutput struct {
 	Matches []GamePublic `json:"matches" jsonschema:"the club matches in the requested time window"`

@@ -99,62 +99,59 @@ func main() {
 	detector := newChangeDetector(previousGames)
 
 	// The fetcher will poll the Volley Manager API at a given rate
-	theFetcher, err := newFetcher(env.APIKey, theState)
-	if err != nil {
-		slog.Error("Got an error while instantiating the fetcher", "err", err)
-		return
-	}
+	theFetcher := newFetcher(env.APIKey)
 
 	// First fetch must complete
-	err = run(cancellableCtx, theFetcher, theState, detector, publisher, env.StateSnapshotPath)
-	if err != nil {
+	if err := run(cancellableCtx, theFetcher, theState, detector, publisher, env.StateSnapshotPath); err != nil {
 		slog.Error("Got an error while fetching the data for the first time", "err", err)
 		return
 	}
 
 	// Fetch loop
 	g.Go(func() error {
-		for range time.Tick(env.RefreshInterval) {
-			err = run(ctx, theFetcher, theState, detector, publisher, env.StateSnapshotPath)
-			if err != nil {
-				slog.Warn("Got an error while fetching the data. Keeping the old version instead of terminating here.", "err", err)
+		ticker := time.NewTicker(env.RefreshInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-ticker.C:
+				if err := run(ctx, theFetcher, theState, detector, publisher, env.StateSnapshotPath); err != nil {
+					slog.Warn("Got an error while fetching the data. Keeping the old version instead of terminating here.", "err", err)
+				}
 			}
 		}
-		return nil
 	})
 
-	// The API will server the request with the data from the state
+	// The API will serve requests with the data from the state
 	theApi := newApi(theState, env.TeamCaptionReplacement)
-	theApi.run(fmt.Sprintf("%s:%s", env.BindIP, env.Port), g)
+	theApi.run(fmt.Sprintf("%s:%s", env.BindIP, env.Port), ctx, g)
 
 	// Wait for any shutdown
 	select {
 	case <-signalChan:
 		slog.Info("Shutdown signal received, exiting...")
 		cancel()
-		break
 	case <-ctx.Done():
 		slog.Info("Group context is done, exiting...")
 		cancel()
-		break
 	}
 
 	// if a non-clean shutdown was triggered, details are printed here
-	err = ctx.Err()
-	if err != nil && !errors.Is(err, context.Canceled) {
-		slog.Error("Got an error from the error group context", "err", err)
+	if err := g.Wait(); err != nil && !errors.Is(err, context.Canceled) {
+		slog.Error("Got an error from the error group", "err", err)
 		os.Exit(1)
 	}
 }
 
 func run(ctx context.Context, f *fetcher, s *state, detector *changeDetector, publisher *sqsPublisher, snapshotPath string) error {
 
-	err := f.fetch(ctx)
+	games, rankings, err := f.fetch(ctx)
 	if err != nil {
 		return err
 	}
 
-	allGames := s.rebuildManagedGames()
+	allGames := s.rebuildManagedGames(games, rankings)
 
 	slog.Info("Pulled", "games", len(s.rawGames), "teams", len(s.teams))
 
