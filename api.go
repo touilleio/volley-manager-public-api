@@ -1,15 +1,18 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
-	ics "github.com/arran4/golang-ical"
-	"github.com/gin-gonic/gin"
-	log "github.com/sirupsen/logrus"
-	"golang.org/x/sync/errgroup"
+	"log/slog"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"golang.org/x/sync/errgroup"
 )
 
 type api struct {
@@ -47,70 +50,87 @@ const (
 	timezone         = "Europe/Zurich"
 )
 
+const (
+	readHeaderTimeout = 5 * time.Second
+	readTimeout       = 15 * time.Second
+	writeTimeout      = 30 * time.Second
+	idleTimeout       = 60 * time.Second
+	shutdownTimeout   = 10 * time.Second
+)
+
+// teamIDParam parses the route parameter once and answers with a generic
+// client error: internal parse details are never reflected to callers.
+func teamIDParam(c *gin.Context) (int, bool) {
+	teamID, err := strconv.Atoi(c.Param("teamid"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid team id"})
+		return 0, false
+	}
+	return teamID, true
+}
+
 func (a *api) upcomingGames(c *gin.Context) {
-	gamesPublic := toUpcomingGamesPublic(a.state.rawGames, a.location, a.teamCaptionReplacement)
+	a.state.lock.RLock()
+	defer a.state.lock.RUnlock()
+	gamesPublic := a.presenter().toUpcomingGamesPublic(a.state.rawGames)
 	c.JSON(http.StatusOK, gamesPublic)
 }
 
 func (a *api) teamUpcomingGames(c *gin.Context) {
 	a.state.lock.RLock()
 	defer a.state.lock.RUnlock()
-	teamIdStr := c.Param("teamid")
-	teamId, err := strconv.Atoi(teamIdStr)
-	if err != nil {
-		c.String(http.StatusBadRequest, "Invalid teamId %s, err = %s", teamIdStr, err.Error())
+	teamID, ok := teamIDParam(c)
+	if !ok {
 		return
 	}
-	gamesPublic := toUpcomingGamesPublic(a.state.gamesPerTeam[teamId], a.location, a.teamCaptionReplacement)
+	gamesPublic := a.presenter().toUpcomingGamesPublic(a.state.gamesPerTeam[teamID])
 	c.JSON(http.StatusOK, gamesPublic)
 }
+
+var filenameSanitizer = strings.NewReplacer("\r", "", "\n", "", `"`, "'")
 
 func (a *api) teamUpcomingGamesICS(c *gin.Context) {
 	a.state.lock.RLock()
 	defer a.state.lock.RUnlock()
-	teamIdStr := c.Param("teamid")
-	teamId, err := strconv.Atoi(teamIdStr)
-	if err != nil {
-		c.String(http.StatusBadRequest, "Invalid teamId %s, err = %s", teamIdStr, err.Error())
+	teamID, ok := teamIDParam(c)
+	if !ok {
 		return
 	}
-	upcomingGames := getUpcomingGames(a.state.gamesPerTeam[teamId], a.location)
-	icsEncoded := toIcal(upcomingGames, a.location)
+	upcomingGames := getUpcomingGames(a.state.gamesPerTeam[teamID], a.location)
+	icsEncoded := a.presenter().toIcal(upcomingGames)
 
-	if team, ok := a.state.teams[teamId]; ok {
-		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", team.Caption))
+	if team, ok := a.state.teams[teamID]; ok {
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filenameSanitizer.Replace(team.Caption)))
 	}
 	c.Data(http.StatusOK, "text/calendar", []byte(icsEncoded))
 }
 
 func (a *api) pastGames(c *gin.Context) {
-	gamesPublic := toPastGamesPublic(a.state.rawGames, a.location, a.teamCaptionReplacement)
+	a.state.lock.RLock()
+	defer a.state.lock.RUnlock()
+	gamesPublic := a.presenter().toPastGamesPublic(a.state.rawGames)
 	c.JSON(http.StatusOK, gamesPublic)
 }
 
 func (a *api) teamPastGames(c *gin.Context) {
 	a.state.lock.RLock()
 	defer a.state.lock.RUnlock()
-	teamIdStr := c.Param("teamid")
-	teamId, err := strconv.Atoi(teamIdStr)
-	if err != nil {
-		c.String(http.StatusBadRequest, "Invalid teamId %s, err = %s", teamIdStr, err.Error())
+	teamID, ok := teamIDParam(c)
+	if !ok {
 		return
 	}
-	gamesPublic := toPastGamesPublic(a.state.gamesPerTeam[teamId], a.location, a.teamCaptionReplacement)
+	gamesPublic := a.presenter().toPastGamesPublic(a.state.gamesPerTeam[teamID])
 	c.JSON(http.StatusOK, gamesPublic)
 }
 
 func (a *api) teamRanking(c *gin.Context) {
 	a.state.lock.RLock()
 	defer a.state.lock.RUnlock()
-	teamIdStr := c.Param("teamid")
-	teamId, err := strconv.Atoi(teamIdStr)
-	if err != nil {
-		c.String(http.StatusBadRequest, "Invalid teamId %s, err = %s", teamIdStr, err.Error())
+	teamID, ok := teamIDParam(c)
+	if !ok {
 		return
 	}
-	rankings := a.state.rankingPerTeam[teamId]
+	rankings := a.state.rankingPerTeam[teamID]
 
 	dedupTeamRanking := make([]TeamRanking, 0, len(rankings.Ranking))
 	teams := make(map[string]bool)
@@ -142,9 +162,24 @@ func (a *api) teams(c *gin.Context) {
 	c.JSON(http.StatusOK, teams)
 }
 
-func (a api) run(address string, g *errgroup.Group) {
+// securityHeaders applies the response headers that are safe for an embeddable
+// read-only API. CSP and frame rules are deployment-specific and documented in
+// the README instead of being forced here.
+func securityHeaders(c *gin.Context) {
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
+	c.Next()
+}
 
-	r := gin.Default()
+func (a *api) router() *gin.Engine {
+	r := gin.New()
+	r.Use(gin.Logger(), gin.Recovery(), securityHeaders)
+	// Proxy headers (X-Forwarded-For) are attacker-controlled unless a
+	// deployment explicitly trusts its reverse proxies; trust none by default.
+	if err := r.SetTrustedProxies(nil); err != nil {
+		panic(fmt.Errorf("disabling trusted proxies: %w", err))
+	}
+
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "pong",
@@ -158,135 +193,60 @@ func (a api) run(address string, g *errgroup.Group) {
 	r.GET("/ranking/:teamid", a.teamRanking)
 	r.GET("/teams", a.teams)
 
+	// Browsers must revalidate static assets on every load so JS/CSS fixes are
+	// picked up immediately; unchanged files still answer 304.
+	r.Use(func(c *gin.Context) {
+		if strings.HasPrefix(c.Request.URL.Path, "/static") {
+			c.Header("Cache-Control", "no-cache")
+		}
+		c.Next()
+	})
 	r.Static("/static", "/static")
 	r.GET("/", func(c *gin.Context) {
 		c.Redirect(http.StatusMovedPermanently, "/static")
 	})
 
+	r.Any("/mcp", gin.WrapH(newMcpHandler(a.state, a.presenter())))
+	return r
+}
+
+func (a *api) newHTTPServer(address string) *http.Server {
+	return &http.Server{
+		Addr:              address,
+		Handler:           a.router(),
+		ReadHeaderTimeout: readHeaderTimeout,
+		ReadTimeout:       readTimeout,
+		WriteTimeout:      writeTimeout,
+		IdleTimeout:       idleTimeout,
+	}
+}
+
+func (a *api) run(address string, ctx context.Context, g *errgroup.Group) {
+	if os.Getenv("GIN_MODE") == "" {
+		gin.SetMode(gin.ReleaseMode)
+	}
+	server := a.newHTTPServer(address)
+
 	g.Go(func() error {
-		err := r.Run(address)
-		if err != nil {
-			log.WithError(err).Errorf("Got an error")
+		err := server.ListenAndServe()
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
 		}
 		return err
 	})
-}
 
-var daysInFrench = strings.NewReplacer(
-	"Monday", "Lundi",
-	"Tuesday", "Mardi",
-	"Wednesday", "Mercredi",
-	"Thursday", "Jeudi",
-	"Friday", "Vendredi",
-	"Saturday", "Samedi",
-	"Sunday", "Dimanche")
-
-func toGamePublic(game Game, location *time.Location, teamCaptionReplacements map[string]string) GamePublic {
-	//parsedTime, _ := time.ParseInLocation(timeFormat, game.PlayDate, location)
-	homeTeam := game.Teams.Home.Caption
-	if replacement, ok := teamCaptionReplacements[homeTeam]; ok {
-		homeTeam = replacement
-	}
-	awayTeam := game.Teams.Away.Caption
-	if replacement, ok := teamCaptionReplacements[awayTeam]; ok {
-		awayTeam = replacement
-	}
-	gp := GamePublic{
-		PlayDate: game.PlayDate, //daysInFrench.Replace(parsedTime.In(location).Format(outputTimeFormat)),
-		HomeTeam: homeTeam,
-		AwayTeam: awayTeam,
-		League:   game.League.Caption,
-		Hall:     fmt.Sprintf("%s, %s", game.Hall.Caption, game.Hall.City),
-	}
-	if game.ResultSummary.Data.Winner != "" {
-		gp.Winner = game.ResultSummary.Data.Winner
-		gp.WonSetsAwayTeam = game.ResultSummary.Data.WonSetsAwayTeam
-		gp.WonSetsHomeTeam = game.ResultSummary.Data.WonSetsHomeTeam
-	}
-	return gp
-}
-
-func getUpcomingGames(games []Game, location *time.Location) []Game {
-	upcomingGames := make([]Game, 0, len(games))
-	for _, g := range games {
-		parsedTime, err := time.ParseInLocation(timeFormat, g.PlayDate, location)
-		if err != nil {
-			// TODO log a warning
-			continue
+	g.Go(func() error {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			slog.Error("Got an error while shutting down the HTTP server", "err", err)
+			return err
 		}
-		now := time.Now()
-		if parsedTime.After(now) {
-			upcomingGames = append(upcomingGames, g)
-		}
-	}
-	return upcomingGames
+		return nil
+	})
 }
 
-func getPastGames(games []Game, location *time.Location) []Game {
-	upcomingGames := make([]Game, 0, len(games))
-	for _, g := range games {
-		parsedTime, err := time.ParseInLocation(timeFormat, g.PlayDate, location)
-		if err != nil {
-			// TODO log a warning
-			continue
-		}
-		now := time.Now()
-		if now.After(parsedTime) {
-			upcomingGames = append(upcomingGames, g)
-		}
-	}
-	return upcomingGames
-}
-
-func toUpcomingGamesPublic(games []Game, location *time.Location, teamCaptionReplacements map[string]string) []GamePublic {
-	gamesPublic := make([]GamePublic, 0, len(games))
-	for _, g := range getUpcomingGames(games, location) {
-		gamesPublic = append(gamesPublic, toGamePublic(g, location, teamCaptionReplacements))
-	}
-	return gamesPublic
-}
-
-func toPastGamesPublic(games []Game, location *time.Location, teamCaptionReplacements map[string]string) []GamePublic {
-	gamesPublic := make([]GamePublic, 0, len(games))
-	for _, g := range getPastGames(games, location) {
-		gamesPublic = append(gamesPublic, toGamePublic(g, location, teamCaptionReplacements))
-	}
-	return gamesPublic
-}
-
-type GamePublic struct {
-	PlayDate        string `json:"playDate"`
-	HomeTeam        string `json:"homeTeam"`
-	AwayTeam        string `json:"awayTeam"`
-	League          string `json:"phase"`
-	Hall            string `json:"hall"`
-	WonSetsHomeTeam int    `json:"wonSetsHomeTeam"`
-	WonSetsAwayTeam int    `json:"wonSetsAwayTeam"`
-	Winner          string `json:"winner"`
-}
-
-func toIcal(games []Game, location *time.Location) string {
-
-	cal := ics.NewCalendar()
-	cal.SetMethod(ics.MethodRequest)
-
-	for _, game := range games {
-		event := cal.AddEvent(fmt.Sprintf("sv-%d", game.GameId))
-
-		parsedTime, err := time.ParseInLocation(timeFormat, game.PlayDate, location)
-		if err != nil {
-			// TODO log a warning
-			continue
-		}
-		event.SetCreatedTime(time.Now())
-		event.SetClass(ics.ClassificationPublic)
-		event.SetDtStampTime(parsedTime)
-		event.SetModifiedAt(time.Now())
-		event.SetStartAt(parsedTime)
-		event.SetEndAt(parsedTime.Add(2 * time.Hour))
-		event.SetSummary(fmt.Sprintf("Match %s vs %s", game.Teams.Home.Caption, game.Teams.Away.Caption))
-		event.SetLocation(fmt.Sprintf("%s, %s", game.Hall.Caption, game.Hall.City))
-		event.SetDescription(fmt.Sprintf("Match %s, %s vs %s, %s @ %s %s", game.League.Caption, game.Teams.Home.Caption, game.Teams.Away.Caption, parsedTime, game.Hall.Caption, game.Hall.City))
-	}
-	return cal.Serialize()
+func (a *api) presenter() gamePresenter {
+	return newGamePresenter(a.location, a.teamCaptionReplacement, a.state.isCup)
 }

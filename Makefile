@@ -1,5 +1,5 @@
 
-VERSION=v2.0.0
+VERSION=v2.1.0
 GOCMD=go
 GOBUILD=$(GOCMD) build
 GOCLEAN=$(GOCMD) clean
@@ -29,9 +29,9 @@ lint:
 build:
 	env GOOS=linux CGO_ENABLED=0 \
 		$(GOBUILD) \
-		-ldflags "-X github.com/sqooba/go-common/version.GitCommit=${GIT_COMMIT}${GIT_DIRTY} \
-			-X github.com/sqooba/go-common/version.BuildDate=${BUILD_DATE} \
-			-X github.com/sqooba/go-common/version.Version=${VERSION}" \
+		-ldflags "-X github.com/touilleio/volley-manager-public-api/internal/buildinfo.GitCommit=${GIT_COMMIT}${GIT_DIRTY} \
+			-X github.com/touilleio/volley-manager-public-api/internal/buildinfo.BuildDate=${BUILD_DATE} \
+			-X github.com/touilleio/volley-manager-public-api/internal/buildinfo.Version=${VERSION}" \
 		-o volley-manager-public-api .
 
 package:

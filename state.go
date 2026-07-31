@@ -6,35 +6,47 @@ import (
 )
 
 type state struct {
-	teamsId        []int
-	rawGames       []Game
-	rawRankings    []GroupRankings
-	teams          map[int]Team
-	gamesPerTeam   map[int][]Game
-	rankingPerTeam map[int]GroupRankings
-	leaguePerTeam  map[int]League
-	groupPerTeam   map[int]Group
-	lock           *sync.RWMutex
+	clubID               string
+	excludedTeamIDs      map[int]struct{}
+	cupLeagueCategoryIDs map[int]struct{}
+	rawGames             []Game
+	rawRankings          []GroupRankings
+	teams                map[int]Team
+	gamesPerTeam         map[int][]Game
+	rankingPerTeam       map[int]GroupRankings
+	leaguePerTeam        map[int]League
+	groupPerTeam         map[int]Group
+	lock                 *sync.RWMutex
 }
 
-func newState(teamsId []int) *state {
+func newState(clubID string, excludedTeamIDs []int, cupLeagueCategoryIDs []int) *state {
+	excluded := make(map[int]struct{}, len(excludedTeamIDs))
+	for _, teamID := range excludedTeamIDs {
+		excluded[teamID] = struct{}{}
+	}
+	cupCategories := make(map[int]struct{}, len(cupLeagueCategoryIDs))
+	for _, leagueCategoryID := range cupLeagueCategoryIDs {
+		cupCategories[leagueCategoryID] = struct{}{}
+	}
 	internalState := state{
-		teamsId: teamsId,
-		lock:    &sync.RWMutex{},
+		clubID:               clubID,
+		excludedTeamIDs:      excluded,
+		cupLeagueCategoryIDs: cupCategories,
+		lock:                 &sync.RWMutex{},
 	}
 	return &internalState
 }
 
-func (s *state) isManagedTeam(teamId int) bool {
-	if len(s.teamsId) == 0 {
-		return true
+func (s *state) isCup(game Game) bool {
+	_, isCup := s.cupLeagueCategoryIDs[game.League.LeagueCategoryId]
+	return isCup
+}
+
+func (s *state) isManagedTeam(team Team) bool {
+	if _, excluded := s.excludedTeamIDs[team.TeamId]; excluded {
+		return false
 	}
-	for _, id := range s.teamsId {
-		if id == teamId {
-			return true
-		}
-	}
-	return false
+	return s.clubID == "" || team.ClubId == s.clubID
 }
 
 type Game struct {

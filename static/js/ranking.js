@@ -51,6 +51,18 @@ $( document ).ready(function() {
 						'url': '/ranking/'+value,
 						'dataSrc': ''
 					},
+					columnDefs: [
+					{ className: 'all', targets: [0, 1, 7] },
+					{ className: 'min-tablet-l', targets: [2, 3, 4, 5, 6] },
+						{ responsivePriority: 1, targets: 0 },
+						{ responsivePriority: 2, targets: 1 },
+						{ responsivePriority: 3, targets: 7 },
+						{ responsivePriority: 100, targets: 2 },
+						{ responsivePriority: 101, targets: 3 },
+						{ responsivePriority: 102, targets: 4 },
+						{ responsivePriority: 103, targets: 5 },
+						{ responsivePriority: 104, targets: 6 }
+					],
 					columns: [
 						{
 							data: 'rank'

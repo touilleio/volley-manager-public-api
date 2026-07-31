@@ -1,2 +1,8 @@
 # ignore docker .env file
 *.env
+
+# local games snapshot (see STATE_SNAPSHOT_PATH)
+data/
+.omo/
+volley-manager-public-api
+.playwright-mcp/

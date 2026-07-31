@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.24-alpine3.22 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine3.23 AS builder
 
 ARG TARGETOS
 ARG TARGETARCH
@@ -17,13 +17,16 @@ COPY . .
 
 RUN env GOOS=${TARGETOS} GOARCH=${TARGETARCH} CGO_ENABLED=0 \
     go build -o volley-manager-public-api \
-    -ldflags "-X github.com/sqooba/go-common/version.GitCommit=${GIT_COMMIT} \
-    			-X github.com/sqooba/go-common/version.BuildDate=${BUILD_DATE} \
-    			-X github.com/sqooba/go-common/version.Version=${VERSION}" \
+    -ldflags "-X github.com/touilleio/volley-manager-public-api/internal/buildinfo.GitCommit=${GIT_COMMIT} \
+			-X github.com/touilleio/volley-manager-public-api/internal/buildinfo.BuildDate=${BUILD_DATE} \
+			-X github.com/touilleio/volley-manager-public-api/internal/buildinfo.Version=${VERSION}" \
     .
 
-FROM --platform=$BUILDPLATFORM alpine:3.22
+FROM --platform=$BUILDPLATFORM alpine:3.23
 RUN apk add --no-cache tzdata
+
+# Games snapshot dir; named volumes inherit this ownership, so nobody can write to them.
+RUN mkdir -p /data && chown nobody:nobody /data
 
 USER nobody
 
@@ -33,4 +36,3 @@ EXPOSE 8080
 
 COPY --from=builder /src/volley-manager-public-api .
 COPY ./static /static
-

@@ -1,16 +1,26 @@
-version: "3"
 services:
   public-api:
-    image: touilleio/volley-manager-public-api:v1.0.0
+    image: touilleio/volley-manager-public-api:v2.1.0-rc4
     restart: unless-stopped
     build:
       context: .
       dockerfile: Dockerfile
     environment:
       - API_KEY
+      - CLUB_ID
+      - EXCLUDED_TEAMS_ID
+      - CUP_LEAGUE_CATEGORY_IDS
+      - SQS_QUEUE_URL
+      - AWS_REGION
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
     ports:
       - 8080:8080
     security_opt:
       - no-new-privileges:true
     volumes:
       - ./static:/static
+      - data:/data
+
+volumes:
+  data:

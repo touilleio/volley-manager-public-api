@@ -5,3 +5,29 @@
 .demo-html-visible {
 	visibility: visible;
 }
+
+/* The ranking table wraps instead of forcing horizontal overflow; DataTables
+   Responsive controls which columns exist at each breakpoint. */
+#rakning.dataTable th,
+#rakning.dataTable td {
+	white-space: normal;
+}
+
+#rakning.dataTable th:nth-child(2),
+#rakning.dataTable td:nth-child(2) {
+	overflow-wrap: anywhere;
+}
+
+@media screen and (max-width: 375px) {
+	#rakning.dataTable thead > tr > th.sorting,
+	#rakning.dataTable thead > tr > th.sorting_asc,
+	#rakning.dataTable thead > tr > th.sorting_desc,
+	#rakning.dataTable tbody td {
+		padding-left: 6px;
+		padding-right: 18px;
+	}
+
+	#rakning.dataTable.dtr-inline.collapsed > tbody > tr > td.dtr-control {
+		padding-left: 24px;
+	}
+}
