@@ -6,26 +6,28 @@
 	visibility: visible;
 }
 
-@media screen and (max-width: 375px) {
-	#rakning.dataTable.nowrap th.all,
-	#rakning.dataTable.nowrap td.all {
-		white-space: normal;
-	}
+/* The ranking table wraps instead of forcing horizontal overflow; DataTables
+   Responsive controls which columns exist at each breakpoint. */
+#rakning.dataTable th,
+#rakning.dataTable td {
+	white-space: normal;
+}
 
-	#rakning.dataTable thead > tr > th.all.sorting,
-	#rakning.dataTable thead > tr > th.all.sorting_asc,
-	#rakning.dataTable thead > tr > th.all.sorting_desc,
-	#rakning.dataTable tbody td.all {
+#rakning.dataTable th:nth-child(2),
+#rakning.dataTable td:nth-child(2) {
+	overflow-wrap: anywhere;
+}
+
+@media screen and (max-width: 375px) {
+	#rakning.dataTable thead > tr > th.sorting,
+	#rakning.dataTable thead > tr > th.sorting_asc,
+	#rakning.dataTable thead > tr > th.sorting_desc,
+	#rakning.dataTable tbody td {
 		padding-left: 6px;
 		padding-right: 18px;
 	}
 
-	#rakning.dataTable.dtr-inline.collapsed > tbody > tr > td.dtr-control.all {
+	#rakning.dataTable.dtr-inline.collapsed > tbody > tr > td.dtr-control {
 		padding-left: 24px;
-	}
-
-	#rakning.dataTable th.all:nth-child(2),
-	#rakning.dataTable td.all:nth-child(2) {
-		overflow-wrap: anywhere;
 	}
 }

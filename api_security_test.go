@@ -155,6 +155,20 @@ func TestRouter_sets_security_headers(t *testing.T) {
 	assert.Equal(t, "strict-origin-when-cross-origin", response.Header().Get("Referrer-Policy"))
 }
 
+func TestRouter_static_assets_require_revalidation(t *testing.T) {
+	// Given the production router
+	gin.SetMode(gin.TestMode)
+	s := newState("", nil, nil)
+	router := newApi(s, nil).router()
+
+	// When a static asset is requested (present or not, the middleware runs first)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/static/js/ranking.js", nil))
+
+	// Then the browser must revalidate it on every load
+	assert.Equal(t, "no-cache", response.Header().Get("Cache-Control"))
+}
+
 func TestHTTPServer_has_timeouts(t *testing.T) {
 	// Given the production HTTP server
 	s := newState("", nil, nil)

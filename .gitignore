@@ -5,3 +5,4 @@
 data/
 .omo/
 volley-manager-public-api
+.playwright-mcp/

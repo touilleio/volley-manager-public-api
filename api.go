@@ -193,6 +193,14 @@ func (a *api) router() *gin.Engine {
 	r.GET("/ranking/:teamid", a.teamRanking)
 	r.GET("/teams", a.teams)
 
+	// Browsers must revalidate static assets on every load so JS/CSS fixes are
+	// picked up immediately; unchanged files still answer 304.
+	r.Use(func(c *gin.Context) {
+		if strings.HasPrefix(c.Request.URL.Path, "/static") {
+			c.Header("Cache-Control", "no-cache")
+		}
+		c.Next()
+	})
 	r.Static("/static", "/static")
 	r.GET("/", func(c *gin.Context) {
 		c.Redirect(http.StatusMovedPermanently, "/static")

@@ -52,8 +52,8 @@ $( document ).ready(function() {
 						'dataSrc': ''
 					},
 					columnDefs: [
-						{ className: 'all', targets: [0, 1, 7] },
-						{ className: 'not-mobile', targets: [2, 3, 4, 5, 6] },
+					{ className: 'all', targets: [0, 1, 7] },
+					{ className: 'min-tablet-l', targets: [2, 3, 4, 5, 6] },
 						{ responsivePriority: 1, targets: 0 },
 						{ responsivePriority: 2, targets: 1 },
 						{ responsivePriority: 3, targets: 7 },
