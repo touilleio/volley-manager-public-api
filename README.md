@@ -18,6 +18,10 @@ Configure .env file base on [.env-example](./.env-example) file, and run the con
 docker compose up -d
 ```
 
+Pre-built images are published to `ghcr.io/touilleio/volley-manager-public-api` by the GitHub
+pipeline on every push to `main` (`latest` tag) and on `v*` version tags. Pin a release with
+`ghcr.io/touilleio/volley-manager-public-api:<version>` instead of `latest` if you prefer.
+
 `CLUB_ID` selects every team belonging to that club (for example `906295`). Leave it empty to
 include all clubs. `EXCLUDED_TEAMS_ID` is an optional comma-separated list of individual team IDs
 to remove from the selection. The former `TEAMS_ID` allow-list is no longer supported.
