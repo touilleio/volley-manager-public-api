@@ -110,9 +110,12 @@ notifications are disabled.
 
 # MCP server
 
-An [MCP](https://modelcontextprotocol.io) endpoint is exposed at `/mcp` (streamable HTTP), so AI
-assistants can query the club's matches directly. Two tools are available, using calendar weeks
-running Monday to Sunday (Europe/Zurich):
+An [MCP](https://modelcontextprotocol.io) endpoint is exposed at `/mcp` (stateless Streamable
+HTTP), so AI assistants can query the club's matches directly. The server implements MCP
+`2026-07-28` with the official Go SDK v1.7.0 and automatically negotiates supported older protocol
+versions. Four tools are available; calendar-week tools use Monday to Sunday (Europe/Zurich):
 
 - `get_next_week_upcoming_matches` — matches of next week
 - `get_current_week_match_results` — match results of the current week, from Monday up to now
+- `list_all_teams` — all managed teams with their `teamId`
+- `get_upcoming_matches_for_team` — all future matches for a `teamId` returned by `list_all_teams`
