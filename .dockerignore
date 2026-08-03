@@ -8,6 +8,7 @@ games-snapshot.json
 
 # VCS metadata, local state, and QA artifacts are not needed to build.
 .git
+.github
 .omo
 .codegraph
 .playwright-mcp
