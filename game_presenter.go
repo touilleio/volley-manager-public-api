@@ -35,6 +35,7 @@ func (p gamePresenter) toGamePublic(game Game) GamePublic {
 		isCup = p.isCup(game)
 	}
 	public := GamePublic{
+		GameId:   game.GameId,
 		PlayDate: game.PlayDate,
 		HomeTeam: homeTeam,
 		AwayTeam: awayTeam,
@@ -89,6 +90,7 @@ func getPastGames(games []Game, location *time.Location) []Game {
 }
 
 type GamePublic struct {
+	GameId          int    `json:"gameId"`
 	PlayDate        string `json:"playDate"`
 	HomeTeam        string `json:"homeTeam"`
 	AwayTeam        string `json:"awayTeam"`

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -78,6 +79,39 @@ func TestRefreshPipeline_never_exposes_unmanaged_games(t *testing.T) {
 	}
 	cancel()
 	refreshes.Wait()
+}
+
+func TestUpcomingGames_include_game_id_in_response(t *testing.T) {
+	// Given the production router with one future game in state
+	gin.SetMode(gin.TestMode)
+	s := newState("", nil, nil)
+	s.rawGames = []Game{{
+		GameId:   42,
+		PlayDate: "2099-01-01 12:00:00",
+		Teams: struct {
+			Home Team `json:"home"`
+			Away Team `json:"away"`
+		}{
+			Home: Team{TeamId: 1, Caption: "Home", ClubId: "home"},
+			Away: Team{TeamId: 2, Caption: "Away", ClubId: "away"},
+		},
+		League: League{Caption: "League"},
+		Hall:   Hall{Caption: "Hall", City: "City"},
+	}}
+	router := newApi(s, nil).router()
+
+	// When the public upcoming endpoint is called
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/upcoming", nil))
+
+	// Then the public payload exposes the source game id
+	require.Equal(t, http.StatusOK, response.Code)
+	var games []struct {
+		GameID int `json:"gameId"`
+	}
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &games))
+	require.Len(t, games, 1)
+	assert.Equal(t, 42, games[0].GameID)
 }
 
 func TestMCPHandler_is_stateless(t *testing.T) {
