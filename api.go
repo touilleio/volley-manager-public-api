@@ -173,7 +173,7 @@ func securityHeaders(c *gin.Context) {
 
 func (a *api) router() *gin.Engine {
 	r := gin.New()
-	r.Use(gin.Logger(), gin.Recovery(), securityHeaders)
+	r.Use(accessLogger(slog.Default()), recoveryLogger(slog.Default()), securityHeaders)
 	// Proxy headers (X-Forwarded-For) are attacker-controlled unless a
 	// deployment explicitly trusts its reverse proxies; trust none by default.
 	if err := r.SetTrustedProxies(nil); err != nil {
