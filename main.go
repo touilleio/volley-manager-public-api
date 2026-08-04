@@ -34,7 +34,8 @@ type EnvConfig struct {
 	MetricsNamespace       string        `envconfig:"METRICS_NAMESPACE" default:""`
 	MetricsSubsystem       string        `envconfig:"METRICS_SUBSYSTEM" default:""`
 	MetricsPath            string        `envconfig:"METRICS_PATH" default:"/metrics"`
-	SqsQueueURL            string        `envconfig:"SQS_QUEUE_URL" default:""`
+	SnsTopicARN            string        `envconfig:"SNS_TOPIC_ARN" default:""`
+	PublishNewGames        bool          `envconfig:"PUBLISH_NEW_GAMES" default:"false"`
 	AwsRegion              string        `envconfig:"AWS_REGION" default:"eu-central-1"`
 	StateSnapshotPath      string        `envconfig:"STATE_SNAPSHOT_PATH" default:"/data/games-snapshot.json"`
 }
@@ -75,17 +76,16 @@ func main() {
 	// The state where information are stored
 	theState := newState(env.ClubID, env.ExcludedTeamIDs, env.CupLeagueCategoryIDs)
 
-	// Change notifications are published to SQS; without a queue URL they are disabled.
-	var publisher *sqsPublisher
-	if env.SqsQueueURL != "" {
-		p, err := newSqsPublisher(cancellableCtx, env.SqsQueueURL, env.AwsRegion)
+	var publisher *snsPublisher
+	if env.SnsTopicARN != "" {
+		p, err := newSnsPublisher(cancellableCtx, env.SnsTopicARN, env.AwsRegion)
 		if err != nil {
-			slog.Error("Got an error while instantiating the SQS publisher", "err", err)
+			slog.Error("Got an error while instantiating the SNS publisher", "err", err)
 			return
 		}
 		publisher = p
 	} else {
-		slog.Info("SQS_QUEUE_URL is not set, match change notifications are disabled")
+		slog.Info("SNS_TOPIC_ARN is not set, match notifications are disabled")
 	}
 
 	// The change detector is primed with the snapshot of the previous run, so
@@ -100,9 +100,17 @@ func main() {
 
 	// The fetcher will poll the Volley Manager API at a given rate
 	theFetcher := newFetcher(env.APIKey)
+	poller := poller{
+		fetcher:         theFetcher,
+		state:           theState,
+		detector:        detector,
+		publisher:       publisher,
+		publishNewGames: env.PublishNewGames,
+		snapshotPath:    env.StateSnapshotPath,
+	}
 
 	// First fetch must complete
-	if err := run(cancellableCtx, theFetcher, theState, detector, publisher, env.StateSnapshotPath); err != nil {
+	if err := poller.run(cancellableCtx); err != nil {
 		slog.Error("Got an error while fetching the data for the first time", "err", err)
 		return
 	}
@@ -116,7 +124,7 @@ func main() {
 			case <-ctx.Done():
 				return nil
 			case <-ticker.C:
-				if err := run(ctx, theFetcher, theState, detector, publisher, env.StateSnapshotPath); err != nil {
+				if err := poller.run(ctx); err != nil {
 					slog.Warn("Got an error while fetching the data. Keeping the old version instead of terminating here.", "err", err)
 				}
 			}
@@ -144,27 +152,43 @@ func main() {
 	}
 }
 
-func run(ctx context.Context, f *fetcher, s *state, detector *changeDetector, publisher *sqsPublisher, snapshotPath string) error {
+type poller struct {
+	fetcher         *fetcher
+	state           *state
+	detector        *changeDetector
+	publisher       *snsPublisher
+	publishNewGames bool
+	snapshotPath    string
+}
 
-	games, rankings, err := f.fetch(ctx)
+func (p *poller) run(ctx context.Context) error {
+	games, rankings, err := p.fetcher.fetch(ctx)
 	if err != nil {
 		return err
 	}
 
-	allGames := s.rebuildManagedGames(games, rankings)
+	allGames := p.state.rebuildManagedGames(games, rankings)
 
-	slog.Info("Pulled", "games", len(s.rawGames), "teams", len(s.teams))
+	slog.Info("Pulled", "games", len(p.state.rawGames), "teams", len(p.state.teams))
 
-	// Publication and snapshot failures never fail the poll; fresh data is already live.
-	if changes := detector.diff(allGames, time.Now()); len(changes) > 0 {
-		slog.Info("Detected changed game(s)", "count", len(changes))
-		if publisher != nil {
-			if err := publisher.publish(ctx, changes); err != nil {
+	diff := p.detector.diff(allGames, time.Now())
+	if len(diff.Changes) > 0 {
+		slog.Info("Detected changed game(s)", "count", len(diff.Changes))
+		if p.publisher != nil {
+			if err := p.publisher.publishChanges(ctx, diff.Changes); err != nil {
 				slog.Warn("Error publishing change notification", "err", err)
 			}
 		}
 	}
-	if err := saveSnapshot(snapshotPath, allGames); err != nil {
+	if p.publishNewGames && len(diff.NewGames) > 0 {
+		slog.Info("Detected new game(s)", "count", len(diff.NewGames))
+		if p.publisher != nil {
+			if err := p.publisher.publishNewGames(ctx, diff.NewGames); err != nil {
+				slog.Warn("Error publishing new games notification", "err", err)
+			}
+		}
+	}
+	if err := saveSnapshot(p.snapshotPath, allGames); err != nil {
 		slog.Warn("Error saving games snapshot", "err", err)
 	}
 

@@ -139,33 +139,43 @@ func TestDiffGames_MultipleGamesAndFields(t *testing.T) {
 	}
 }
 
-func TestChangeDetector_FirstPollBaselinesSilently(t *testing.T) {
+func TestChangeDetector_FreshFirstPollIsSilent(t *testing.T) {
+	// Given
 	detector := newChangeDetector(nil)
-	assert.Nil(t, detector.diff([]Game{baseGame()}, diffNow))
 
-	moved := baseGame()
-	moved.PlayDate = "2025-09-21 15:00:00"
-	assert.Len(t, detector.diff([]Game{moved}, diffNow), 1)
+	// When
+	diff := detector.diff([]Game{baseGame()}, diffNow)
+
+	// Then
+	assert.Empty(t, diff.Changes)
+	assert.Empty(t, diff.NewGames)
 }
 
 func TestChangeDetector_PrimedWithSnapshot(t *testing.T) {
+	// Given
 	detector := newChangeDetector([]Game{baseGame()})
 
 	moved := baseGame()
 	moved.PlayDate = "2025-09-21 15:00:00"
-	assert.Len(t, detector.diff([]Game{moved}, diffNow), 1)
 
-	assert.Empty(t, detector.diff([]Game{moved}, diffNow))
+	// When
+	diff := detector.diff([]Game{moved}, diffNow)
+
+	// Then
+	assert.Len(t, diff.Changes, 1)
+	assert.Empty(t, diff.NewGames)
 }
 
-func TestChangeDetector_EmptySnapshotIsPrimed(t *testing.T) {
-	detector := newChangeDetector([]Game{})
-	moved := baseGame()
-	moved.PlayDate = "2025-09-21 15:00:00"
-	// New game vs empty baseline: ignored, but detector must be primed.
-	assert.Empty(t, detector.diff([]Game{moved}, diffNow))
+func TestChangeDetector_SnapshotPrimedNewGamesAreDetected(t *testing.T) {
+	// Given
+	detector := newChangeDetector([]Game{baseGame()})
+	newGame := makeGame(2, "2025-09-21 18:00:00", 10, "Salle du Collège", "Fribourg",
+		100, "Gibloux Volley F1", 201, "Volley Lausanne", 1)
 
-	movedAgain := moved
-	movedAgain.PlayDate = "2025-09-22 15:00:00"
-	assert.Len(t, detector.diff([]Game{movedAgain}, diffNow), 1)
+	// When
+	diff := detector.diff([]Game{baseGame(), newGame}, diffNow)
+
+	// Then
+	assert.Empty(t, diff.Changes)
+	assert.Len(t, diff.NewGames, 1)
 }

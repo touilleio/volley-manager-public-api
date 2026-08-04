@@ -10,10 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Simulates a restart followed by a poll: the detector is primed from a
-// snapshot in which one managed game was moved (date + hall), and the
-// resulting SQS message must carry that move in its payload.
-func TestPollDiffPublishesToSqs(t *testing.T) {
+func TestPollDiffPublishesToSns(t *testing.T) {
+	// Given
 	raw, err := os.ReadFile("test-data/games-with-cup.json")
 	assert.Nil(t, err)
 	var allGames []Game
@@ -39,21 +37,29 @@ func TestPollDiffPublishesToSqs(t *testing.T) {
 
 	beforeSeason := time.Date(2025, 9, 1, 0, 0, 0, 0, time.UTC)
 	detector := newChangeDetector(previous)
-	changes := detector.diff(current, beforeSeason)
 
-	if !assert.Len(t, changes, 1) {
+	// When
+	diff := detector.diff(current, beforeSeason)
+
+	// Then
+	if !assert.Len(t, diff.Changes, 1) {
 		return
 	}
-	assert.Equal(t, current[0].GameId, changes[0].Game.GameId)
-	assert.Len(t, changes[0].Changes, 2)
+	assert.Equal(t, current[0].GameId, diff.Changes[0].Game.GameId)
+	assert.Len(t, diff.Changes[0].Changes, 2)
 
-	stub := &stubSqsClient{}
-	publisher := &sqsPublisher{client: stub, queueURL: "queue"}
-	assert.Nil(t, publisher.publish(context.Background(), changes))
+	// Given
+	stub := &stubSnsClient{}
+	publisher := snsPublisher{client: stub, topicArn: "arn:aws:sns:eu-central-1:123:volley"}
+
+	// When
+	assert.Nil(t, publisher.publishChanges(context.Background(), diff.Changes))
+
+	// Then
 	assert.Equal(t, 1, stub.calls)
 
 	var notification changeNotification
-	assert.Nil(t, json.Unmarshal([]byte(*stub.input.MessageBody), &notification))
+	assert.Nil(t, json.Unmarshal([]byte(*stub.input.Message), &notification))
 	if assert.Len(t, notification.Games, 1) {
 		assert.Equal(t, current[0].GameId, notification.Games[0].GameId)
 		assert.Equal(t, current[0].Teams.Home.Caption, notification.Games[0].HomeTeam)

@@ -72,12 +72,26 @@ Keep secrets out of the image build: `.dockerignore` excludes `.env`, Terraform 
 game snapshots, and `.git` from the build context. Rotate credentials if a build context or
 builder cache containing them ever left your workstation.
 
-# Match change notifications
+# Match notifications
 
-At every poll, the freshly fetched matches are compared with the previous state. When a managed
-match is moved (new date/time, new hall, home/away swap) or its status changes, a JSON payload is
-published to an AWS SQS queue. Matches that changed while the application was stopped are detected
-on the first poll after a restart, thanks to a games snapshot stored in the `data` docker volume.
+At every poll, freshly fetched matches are compared with the previous state. Moved matches
+(date/time, hall, home/away swap) and status changes produce a `volley.matches.changed` JSON event.
+Set `PUBLISH_NEW_GAMES=true` to also publish `volley.matches.new` events for newly detected
+matches. Matches that changed while the application was stopped are detected on the first poll after
+a restart, thanks to a games snapshot stored in the `data` docker volume.
+
+The application publishes events to an SNS topic, not to an SQS queue. Set `SNS_TOPIC_ARN` and the
+publisher credentials (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`, optionally `AWS_REGION`) in
+your `.env` file. `PUBLISH_NEW_GAMES` defaults to `false`. When `SNS_TOPIC_ARN` is unset,
+notifications are disabled.
+
+The Terraform setup in [deployment/](./deployment) creates the topic and one subscribed SQS queue
+per suffix. Its default suffixes are `generic-wacli` and `marqueurs`. Get the queue URLs with
+`terraform output -json queue_urls`; for example, use
+`terraform output -json queue_urls | jq -r '."generic-wacli"'` as `QUEUE_URL` for
+`scripts/sqs-whatsapp-notifier.sh`. Consumers poll SQS; they do not read from SNS directly. SNS
+subscriptions use `raw_message_delivery = true`, so each SQS message `Body` is the raw event JSON
+shown below, not an SNS envelope.
 
 The payload is formatting-independent; consumers own the rendering (Telegram message, email, ...):
 
@@ -103,10 +117,25 @@ The payload is formatting-independent; consumers own the rendering (Telegram mes
 }
 ```
 
-Set `SQS_QUEUE_URL` and the publisher credentials (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`,
-optionally `AWS_REGION`) in your `.env` file (see [.env-example](./.env-example)). The queue and the
-IAM users are created by the terraform setup in [deployment/](./deployment). When unset,
-notifications are disabled.
+New-match events have the same envelope and match metadata, without a `changes` array:
+
+```json
+{
+  "version": 1,
+  "type": "volley.matches.new",
+  "detectedAt": "2026-07-24T16:00:00+02:00",
+  "games": [
+    {
+      "gameId": 391648,
+      "playDate": "2025-09-28 15:00:00",
+      "homeTeam": "Gibloux Volley F1",
+      "awayTeam": "VBC Sense",
+      "league": "2L",
+      "hall": "Gymnase, Bulle"
+    }
+  ]
+}
+```
 
 # MCP server
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Polls the match-change SQS queue and forwards each change to WhatsApp via wacli.
+# Polls the SQS queue subscribed to match-notification SNS topic and forwards events to WhatsApp via wacli.
 #
 # Required environment:
-#   QUEUE_URL    SQS queue URL (terraform output queue_url)
+#   QUEUE_URL    SQS queue URL from terraform output queue_urls, usually generic-wacli
 #   WACLI_TO     WhatsApp recipient: JID, phone number, or contact/group name
 # Optional environment:
 #   AWS_PROFILE  AWS CLI profile with sqs:ReceiveMessage/DeleteMessage (default: default)
@@ -48,26 +48,41 @@ change_line() {
 	esac
 }
 
-# Renders one WhatsApp message per changed game on stdout, games separated by
+# Renders one WhatsApp message per game on stdout, games separated by
 # a form-feed character so the caller can split without losing newlines.
 format_messages() {
 	local body="$1"
-	[ "$(jq -r '.type // ""' <<<"$body")" = "volley.matches.changed" ] || return 0
-	jq -c '.games[]' <<<"$body" | while IFS= read -r game; do
-		{
-			printf '🏐 *Match modifié — %s*\n' "$(jq -r '.league' <<<"$game")"
-			printf '⚔️ %s vs %s\n' "$(jq -r '.homeTeam' <<<"$game")" "$(jq -r '.awayTeam' <<<"$game")"
-			printf '📅 %s\n' "$(format_date "$(jq -r '.playDate' <<<"$game")")"
-			printf '📍 %s\n' "$(jq -r '.hall' <<<"$game")"
-			printf '\n'
-			jq -r '.changes[] | [.field, .old, .new] | @tsv' <<<"$game" |
-				while IFS=$'\t' read -r field old new; do
-					change_line "$field" "$old" "$new"
-					printf '\n'
-				done
-			printf '\f'
-		}
-	done
+	case "$(jq -r '.type // ""' <<<"$body")" in
+	volley.matches.changed)
+		jq -c '.games[]' <<<"$body" | while IFS= read -r game; do
+			{
+				printf '🏐 *Match modifié : %s*\n' "$(jq -r '.league' <<<"$game")"
+				printf '⚔️ %s vs %s\n' "$(jq -r '.homeTeam' <<<"$game")" "$(jq -r '.awayTeam' <<<"$game")"
+				printf '📅 %s\n' "$(format_date "$(jq -r '.playDate' <<<"$game")")"
+				printf '📍 %s\n' "$(jq -r '.hall' <<<"$game")"
+				printf '\n'
+				jq -r '.changes[] | [.field, .old, .new] | @tsv' <<<"$game" |
+					while IFS=$'\t' read -r field old new; do
+						change_line "$field" "$old" "$new"
+						printf '\n'
+					done
+				printf '\f'
+			}
+		done
+		;;
+	volley.matches.new)
+		jq -c '.games[]' <<<"$body" | while IFS= read -r game; do
+			{
+				printf '🏐 *Nouveau match : %s*\n' "$(jq -r '.league' <<<"$game")"
+				printf '⚔️ %s vs %s\n' "$(jq -r '.homeTeam' <<<"$game")" "$(jq -r '.awayTeam' <<<"$game")"
+				printf '📅 %s\n' "$(format_date "$(jq -r '.playDate' <<<"$game")")"
+				printf '📍 %s\n' "$(jq -r '.hall' <<<"$game")"
+				printf '🔖 Match #%s\n' "$(jq -r '.gameId' <<<"$game")"
+				printf '\f'
+			}
+		done
+		;;
+	esac
 }
 
 send_whatsapp() {

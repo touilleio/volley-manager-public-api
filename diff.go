@@ -29,6 +29,11 @@ type GameChange struct {
 	Changes []FieldChange
 }
 
+type GameDiff struct {
+	Changes  []GameChange
+	NewGames []Game
+}
+
 var clubLocation = func() *time.Location {
 	location, err := time.LoadLocation(timezone)
 	if err != nil {
@@ -87,6 +92,25 @@ func diffGames(previous, current []Game, now time.Time) []GameChange {
 	return changes
 }
 
+func newGames(previous, current []Game, now time.Time) []Game {
+	previousById := make(map[int]struct{}, len(previous))
+	for _, game := range previous {
+		previousById[game.GameId] = struct{}{}
+	}
+
+	games := make([]Game, 0)
+	for _, game := range current {
+		if _, ok := previousById[game.GameId]; ok {
+			continue
+		}
+		if !isUpcoming(game, now) {
+			continue
+		}
+		games = append(games, game)
+	}
+	return games
+}
+
 func isUpcoming(game Game, now time.Time) bool {
 	parsedTime, err := time.ParseInLocation(timeFormat, game.PlayDate, clubLocation)
 	if err != nil {
@@ -113,16 +137,16 @@ func newChangeDetector(previous []Game) *changeDetector {
 	return &changeDetector{previous: previous, primed: previous != nil}
 }
 
-// diff compares the current poll with the baseline, then replaces the
-// baseline with the current poll. It returns nil on the first poll after a
-// fresh start.
-func (d *changeDetector) diff(current []Game, now time.Time) []GameChange {
+func (d *changeDetector) diff(current []Game, now time.Time) GameDiff {
 	if !d.primed {
 		d.previous = current
 		d.primed = true
-		return nil
+		return GameDiff{}
 	}
-	changes := diffGames(d.previous, current, now)
+	diff := GameDiff{
+		Changes:  diffGames(d.previous, current, now),
+		NewGames: newGames(d.previous, current, now),
+	}
 	d.previous = current
-	return changes
+	return diff
 }
