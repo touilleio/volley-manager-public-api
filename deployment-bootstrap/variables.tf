@@ -17,7 +17,7 @@ variable "project" {
 }
 
 variable "queue_name" {
-  description = "Name of the notifications queue the deployer may manage. Must match queue_name in deployment/ so the policy ARNs line up."
+  description = "Resource-name prefix/base for the notifications SNS topic and SQS queues the deployer may manage. Must match queue_name in deployment/."
   type        = string
   default     = "volley-manager-notifications"
 }

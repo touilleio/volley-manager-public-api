@@ -17,9 +17,15 @@ variable "project" {
 }
 
 variable "queue_name" {
-  description = "Name of the notifications queue"
+  description = "Base name for the notifications SNS topic and SQS queues"
   type        = string
   default     = "volley-manager-notifications"
+}
+
+variable "queue_suffixes" {
+  description = "Suffixes appended to queue_name for each subscribed notifications queue"
+  type        = list(string)
+  default     = ["generic-wacli", "marqueurs"]
 }
 
 variable "message_retention_seconds" {

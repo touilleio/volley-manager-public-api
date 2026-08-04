@@ -3,3 +3,5 @@ aws_region  = "eu-central-1" # Frankfurt; eu-central-2 (Zurich) requires enablin
 aws_profile = "registry"     # any profile from ~/.aws/credentials; omit to use AWS_PROFILE/default chain
 project     = "volley-manager"
 queue_name  = "volley-manager-notifications"
+
+queue_suffixes = ["generic-wacli", "marqueurs"]
