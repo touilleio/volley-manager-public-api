@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -187,6 +188,43 @@ func TestRouter_sets_security_headers(t *testing.T) {
 	// Then baseline anti-MIME-sniffing and referrer headers are present
 	assert.Equal(t, "nosniff", response.Header().Get("X-Content-Type-Options"))
 	assert.Equal(t, "strict-origin-when-cross-origin", response.Header().Get("Referrer-Policy"))
+}
+
+func TestRouter_root_redirects_permanently_to_upcoming_page(t *testing.T) {
+	// Given the production router
+	gin.SetMode(gin.TestMode)
+	s := newState("", nil, nil)
+	router := newApi(s, nil).router()
+
+	// When the root page is requested
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
+
+	// Then browsers land directly on the upcoming matches page
+	assert.Equal(t, http.StatusMovedPermanently, response.Code)
+	assert.Equal(t, "/static/upcoming.html", response.Header().Get("Location"))
+}
+
+func TestStaticPages_reference_svg_favicon(t *testing.T) {
+	for _, page := range []string{"static/upcoming.html", "static/past.html", "static/ranking.html"} {
+		contents, err := os.ReadFile(page)
+		require.NoError(t, err, page)
+		assert.Contains(t, string(contents), `<link rel="icon" type="image/svg+xml" href="img/favicon.svg">`, page)
+	}
+
+	_, err := os.Stat("static/index.html")
+	assert.True(t, os.IsNotExist(err), "static/index.html should be removed")
+}
+
+func TestFavicon_uses_only_yellow_volleyball_geometry(t *testing.T) {
+	contents, err := os.ReadFile("static/img/favicon.svg")
+	require.NoError(t, err)
+	favicon := string(contents)
+
+	assert.Contains(t, favicon, `viewBox="117.62 101.38 60.63 60.63"`)
+	assert.Contains(t, favicon, `fill="#FDC500"`)
+	assert.NotContains(t, favicon, `#417BA6`)
+	assert.NotContains(t, favicon, `logo_giblouxvolley.svg`)
 }
 
 func TestRouter_static_assets_require_revalidation(t *testing.T) {

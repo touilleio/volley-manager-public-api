@@ -209,7 +209,10 @@ func (a *api) router() *gin.Engine {
 	})
 	r.Static("/static", "/static")
 	r.GET("/", func(c *gin.Context) {
-		c.Redirect(http.StatusMovedPermanently, "/static")
+		c.Redirect(http.StatusMovedPermanently, "/static/upcoming.html")
+	})
+	r.GET("/static/index.html", func(c *gin.Context) {
+		c.Redirect(http.StatusMovedPermanently, "/static/upcoming.html")
 	})
 
 	r.Any("/mcp", gin.WrapH(newMcpHandler(a.state, a.presenter())))
