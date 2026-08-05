@@ -32,7 +32,7 @@ $( document ).ready(function() {
 	
 	teams = []
 	
-	$.getJSON("/teams", function(result){
+	$.getJSON("/api/teams", function(result){
 		$.each(result, function(i, field){
 			teams.push(field + ":" + i)
 		});
@@ -58,7 +58,7 @@ $( document ).ready(function() {
 			},	
 			order: [[0, "desc"]],
 			ajax: {
-				'url': '/past',
+				'url': '/api/past',
 				'dataSrc': ''
 			},
 			columnDefs: [
@@ -107,7 +107,7 @@ $( document ).ready(function() {
 		$('#sel_team_id').on('change', function () {
 			caption = $(this).find(":selected").text()
 			value = $(this).find(":selected").val()
-			oTable.ajax.url('/past/' + value).load();
+			oTable.ajax.url('/api/past/' + value).load();
             oTable.draw();
 		});
 	});

@@ -71,10 +71,10 @@ func TestRefreshPipeline_never_exposes_unmanaged_games(t *testing.T) {
 	for range 200 {
 		// Then only managed games are ever visible (run with -race)
 		response := httptest.NewRecorder()
-		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/upcoming", nil))
+		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/upcoming", nil))
 		assert.NotContains(t, response.Body.String(), "Unmanaged")
 		response = httptest.NewRecorder()
-		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/past", nil))
+		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/past", nil))
 		assert.NotContains(t, response.Body.String(), "Unmanaged")
 	}
 	cancel()
@@ -102,7 +102,7 @@ func TestUpcomingGames_include_game_id_in_response(t *testing.T) {
 
 	// When the public upcoming endpoint is called
 	response := httptest.NewRecorder()
-	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/upcoming", nil))
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/upcoming", nil))
 
 	// Then the public payload exposes the source game id
 	require.Equal(t, http.StatusOK, response.Code)
@@ -142,7 +142,7 @@ func TestTeamEndpoints_reject_invalid_id_without_internal_details(t *testing.T) 
 	s := newState("", nil, nil)
 	router := newApi(s, nil).router()
 
-	for _, path := range []string{"/upcoming/abc", "/past/abc", "/ranking/abc", "/ics/upcoming/abc"} {
+	for _, path := range []string{"/api/upcoming/abc", "/api/past/abc", "/api/ranking/abc", "/ics/upcoming/abc"} {
 		// When the team id is not numeric
 		response := httptest.NewRecorder()
 		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))

@@ -46,8 +46,8 @@ http://localhost:8080/
 
 # Security and production deployment
 
-This service is a **public, read-only API**: `/upcoming`, `/past`, `/ranking`, `/teams`, the
-calendar download, and the MCP endpoint intentionally require no authentication. Deploy it only
+This service is a **public, read-only API**: `/api/upcoming`, `/api/past`, `/api/ranking`, `/api/teams`,
+the calendar download, and the MCP endpoint intentionally require no authentication. Deploy it only
 with data you are comfortable publishing, and never expose the upstream `API_KEY` (it is used
 server-side only and never returned in responses).
 
