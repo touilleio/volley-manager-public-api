@@ -173,7 +173,7 @@ func securityHeaders(c *gin.Context) {
 
 func (a *api) router() *gin.Engine {
 	r := gin.New()
-	r.Use(gin.Logger(), gin.Recovery(), securityHeaders)
+	r.Use(accessLogger(slog.Default()), recoveryLogger(slog.Default()), securityHeaders)
 	// Proxy headers (X-Forwarded-For) are attacker-controlled unless a
 	// deployment explicitly trusts its reverse proxies; trust none by default.
 	if err := r.SetTrustedProxies(nil); err != nil {
@@ -185,13 +185,19 @@ func (a *api) router() *gin.Engine {
 			"message": "pong",
 		})
 	})
-	r.GET("/upcoming", a.upcomingGames)
-	r.GET("/upcoming/:teamid", a.teamUpcomingGames)
+	r.GET("/upcoming", a.upcomingGames) // deprected
+	r.GET("/api/upcoming", a.upcomingGames)
+	r.GET("/upcoming/:teamid", a.teamUpcomingGames) // deprected
+	r.GET("/api/upcoming/:teamid", a.teamUpcomingGames)
 	r.GET("/ics/upcoming/:teamid", a.teamUpcomingGamesICS)
-	r.GET("/past", a.pastGames)
-	r.GET("/past/:teamid", a.teamPastGames)
-	r.GET("/ranking/:teamid", a.teamRanking)
-	r.GET("/teams", a.teams)
+	r.GET("/past", a.pastGames) // deprected
+	r.GET("/api/past", a.pastGames)
+	r.GET("/past/:teamid", a.teamPastGames) // deprected
+	r.GET("/api/past/:teamid", a.teamPastGames)
+	r.GET("/ranking/:teamid", a.teamRanking) // deprected
+	r.GET("/api/ranking/:teamid", a.teamRanking)
+	r.GET("/teams", a.teams) // deprected
+	r.GET("/api/teams", a.teams)
 
 	// Browsers must revalidate static assets on every load so JS/CSS fixes are
 	// picked up immediately; unchanged files still answer 304.
@@ -203,7 +209,7 @@ func (a *api) router() *gin.Engine {
 	})
 	r.Static("/static", "/static")
 	r.GET("/", func(c *gin.Context) {
-		c.Redirect(http.StatusMovedPermanently, "/static")
+		c.Redirect(http.StatusMovedPermanently, "/static/upcoming.html")
 	})
 
 	r.Any("/mcp", gin.WrapH(newMcpHandler(a.state, a.presenter())))

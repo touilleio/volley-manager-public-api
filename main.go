@@ -43,7 +43,7 @@ type EnvConfig struct {
 func main() {
 
 	var logLevel = new(slog.LevelVar)
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})))
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})))
 
 	slog.Info("volley-manager-public-api application is starting...",
 		"version", buildinfo.Version,

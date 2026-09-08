@@ -10,7 +10,7 @@ $( document ).ready(function() {
 	
 	teams = []
 	
-	$.getJSON("/teams", function(result){
+	$.getJSON("/api/teams", function(result){
 		$.each(result, function(i, field){
 			teams.push(field + ":" + i)
 		});
@@ -48,7 +48,7 @@ $( document ).ready(function() {
 					},	
 					order: [[0, "asc"]],
 					ajax: {
-						'url': '/ranking/'+value,
+						'url': '/api/ranking/'+value,
 						'dataSrc': ''
 					},
 					columnDefs: [

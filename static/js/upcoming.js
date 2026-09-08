@@ -35,7 +35,7 @@ $( document ).ready(function() {
 	//moment().locale('fr-fr')
 	//alert(moment.locale())
 	
-	$.getJSON("/teams", function(result){
+	$.getJSON("/api/teams", function(result){
 		$.each(result, function(i, field){
 			teams.push(field + ":" + i)
 		});
@@ -62,7 +62,7 @@ $( document ).ready(function() {
 			},	
 			order: [[0, "asc"]],
 			ajax: {
-				'url': '/upcoming',
+				'url': '/api/upcoming',
 				'dataSrc': ''
 			},
 			columnDefs: [
@@ -99,7 +99,7 @@ $( document ).ready(function() {
 			if(caption != 'Toutes'){
 				$('#team-filter').append('<a id="ics_export" href="/ics/upcoming/'+$('#sel_team_id').find(":selected").val()+'" target"_blank">Exporter calendrier</a>');
 			}
-			oTable.ajax.url('/upcoming/' + value).load();
+			oTable.ajax.url('/api/upcoming/' + value).load();
             oTable.draw();
 		});
 	});

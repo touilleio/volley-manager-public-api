@@ -5064,3 +5064,375 @@ html.dark button.active,html.dark a.purchase.active {
     white-space: nowrap;
     border: 0
 }
+
+/* === Gibloux Volley semantic theme system === */
+:root {
+    color-scheme: light;
+    --color-page: #FFFFFF;
+    --color-surface: #FFFFFF;
+    --color-surface-elevated: #F7F9FA;
+    --color-text: #333333;
+    --color-text-muted: #545454;
+    --color-border: #E6E6E6;
+    --color-link: #417BA6;
+    --color-link-hover: #2F6188;
+    --color-brand-blue: #417BA6;
+    --color-brand-yellow: #FDC500;
+    --color-on-brand-yellow: #333333;
+    --color-row-hover: #F6F6F6;
+    --color-row-selected: #E8F1F7;
+    --color-focus: #417BA6;
+    --color-icon: #545454;
+    --color-background: var(--color-page);
+    --color-accent: var(--color-brand-yellow)
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+        color-scheme: dark;
+        --color-page: #101820;
+        --color-surface: #162230;
+        --color-surface-elevated: #1E2D3B;
+        --color-text: #F2F7FA;
+        --color-text-muted: #B8C6D1;
+        --color-border: #31475B;
+        --color-link: #8BC7F0;
+        --color-link-hover: #B9E2FA;
+        --color-brand-blue: #417BA6;
+        --color-brand-yellow: #FFD84D;
+        --color-on-brand-yellow: #101820;
+        --color-row-hover: #223548;
+        --color-row-selected: #203B50;
+        --color-focus: #8BC7F0;
+        --color-icon: #B8C6D1
+    }
+}
+
+html[data-theme="light"] {
+    color-scheme: light
+}
+
+html[data-theme="dark"] {
+    color-scheme: dark;
+    --color-page: #101820;
+    --color-surface: #162230;
+    --color-surface-elevated: #1E2D3B;
+    --color-text: #F2F7FA;
+    --color-text-muted: #B8C6D1;
+    --color-border: #31475B;
+    --color-link: #8BC7F0;
+    --color-link-hover: #B9E2FA;
+    --color-brand-blue: #417BA6;
+    --color-brand-yellow: #FFD84D;
+    --color-on-brand-yellow: #101820;
+    --color-row-hover: #223548;
+    --color-row-selected: #203B50;
+    --color-focus: #8BC7F0;
+    --color-icon: #B8C6D1
+}
+
+html,
+body {
+    background: var(--color-page);
+    color: var(--color-text)
+}
+
+body,
+div.fw-container,
+div.fw-container div.fw-body,
+div.fw-container div.fw-body div.content,
+.page_menu,
+table.dataTable,
+table.dataTable th,
+table.dataTable td,
+select,
+input,
+textarea,
+button[data-theme-toggle] {
+    transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease
+}
+
+body,
+div.fw-container div.fw-body div.content,
+div.fw-container div.fw-body div.content>h1,
+.page_title {
+    color: var(--color-text)
+}
+
+a {
+    color: var(--color-link)
+}
+
+a:hover {
+    color: var(--color-link-hover)
+}
+
+div.page_menu a,
+nav.page_menu a,
+.page_menu a {
+    color: var(--color-text-muted)
+}
+
+div.page_menu a:hover,
+nav.page_menu a:hover,
+.page_menu a:hover {
+    color: var(--color-link-hover)
+}
+
+.active,
+.page_menu a.active {
+    color: var(--color-text-muted)
+}
+
+#logo {
+    color: var(--color-text-muted)
+}
+
+a:focus-visible,
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+table.dataTable thead th:focus-visible,
+button[data-theme-toggle]:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px
+}
+
+button[data-theme-toggle] {
+    min-width: 44px;
+    min-height: 44px;
+    margin-left: 8px;
+    padding: 8px 16px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    vertical-align: middle;
+    border: 1px solid var(--color-border);
+    border-radius: 24px;
+    background-color: var(--color-surface);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    font: inherit;
+    line-height: 1
+}
+
+button[data-theme-toggle]:hover {
+    color: var(--color-link-hover);
+    border-color: var(--color-focus)
+}
+
+button[data-theme-toggle] svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: var(--color-icon);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round
+}
+
+button[data-theme-toggle] svg[hidden] {
+    display: none
+}
+
+#team-filter,
+#team-filter label,
+div.dataTables_filter label,
+div.dataTables_length label,
+div.dataTables_info {
+    color: var(--color-text-muted)
+}
+
+select,
+input,
+textarea,
+#sel_team_id,
+div.dataTables_wrapper select,
+div.dataTables_wrapper input {
+    background-color: var(--color-surface);
+    color: var(--color-text);
+    border: 1px solid var(--color-border)
+}
+
+#ics_export {
+    color: var(--color-link)
+}
+
+#ics_export:hover {
+    color: var(--color-link-hover)
+}
+
+.league-cell {
+    color: inherit
+}
+
+.league-cup-indicator,
+.league-cup-badge {
+    color: var(--color-brand-yellow)
+}
+
+.league-cup-icon {
+    color: currentColor;
+    stroke: currentColor
+}
+
+div.dataTables_wrapper {
+    color: var(--color-text);
+    background: transparent
+}
+
+div.dataTables_filter,
+div.dataTables_length,
+div.dataTables_info {
+    color: var(--color-text-muted)
+}
+
+div.dataTables_filter input,
+div.dataTables_length select {
+    margin-left: 8px;
+    padding: 4px 8px;
+    border-radius: 4px
+}
+
+table.dataTable {
+    color: var(--color-text);
+    background-color: var(--color-surface);
+    border-color: var(--color-border)
+}
+
+table.dataTable.no-footer {
+    border-bottom-color: var(--color-border)
+}
+
+table.dataTable thead th,
+table.dataTable thead td {
+    color: var(--color-text);
+    background-color: var(--color-surface-elevated);
+    border-bottom-color: var(--color-border)
+}
+
+table.dataTable tbody th,
+table.dataTable tbody td {
+    color: var(--color-text);
+    border-top-color: var(--color-border)
+}
+
+table.dataTable tbody tr {
+    background-color: var(--color-surface)
+}
+
+table.dataTable tbody tr.odd,
+table.dataTable.stripe tbody tr.odd,
+table.dataTable.display tbody tr.odd {
+    background-color: var(--color-surface-elevated)
+}
+
+table.dataTable tbody tr.even,
+table.dataTable.stripe tbody tr.even,
+table.dataTable.display tbody tr.even {
+    background-color: var(--color-surface)
+}
+
+table.dataTable.hover tbody tr:hover,
+table.dataTable.display tbody tr:hover,
+table.dataTable tbody tr:hover {
+    background-color: var(--color-row-hover)
+}
+
+table.dataTable.display tbody tr:hover>.sorting_1,
+table.dataTable.order-column.hover tbody tr:hover>.sorting_1,
+table.dataTable.order-column.stripe tbody tr.odd>.sorting_1,
+table.dataTable.order-column.stripe tbody tr.even>.sorting_1,
+table.dataTable.display tbody tr.odd>.sorting_1,
+table.dataTable.display tbody tr.even>.sorting_1 {
+    background-color: inherit
+}
+
+table.dataTable tbody tr.selected,
+table.dataTable tbody tr.selected>* {
+    background-color: var(--color-row-selected) !important;
+    color: var(--color-text) !important;
+    box-shadow: inset 0 0 0 9999px var(--color-row-selected) !important
+}
+
+table.dataTable.dtr-inline.collapsed>tbody>tr>td.dtr-control,
+table.dataTable.dtr-inline.collapsed>tbody>tr>th.dtr-control {
+    color: var(--color-link);
+    cursor: pointer
+}
+
+table.dataTable.dtr-inline.collapsed>tbody>tr>td.dtr-control:before,
+table.dataTable.dtr-inline.collapsed>tbody>tr>th.dtr-control:before {
+    background-color: var(--color-brand-blue);
+    border-color: var(--color-border);
+    color: var(--color-surface)
+}
+
+table.dataTable tbody tr.child,
+table.dataTable tbody tr.child:hover {
+    background-color: var(--color-surface-elevated)
+}
+
+table.dataTable tbody tr.child ul.dtr-details,
+table.dataTable tbody tr.child ul.dtr-details>li {
+    color: var(--color-text);
+    border-bottom-color: var(--color-border)
+}
+
+div.dataTables_paginate {
+    color: var(--color-text-muted)
+}
+
+div.dataTables_paginate .paginate_button,
+div.dataTables_wrapper .dataTables_paginate .paginate_button {
+    color: var(--color-link) !important;
+    border-color: transparent !important;
+    background: transparent !important
+}
+
+div.dataTables_paginate .paginate_button:hover,
+div.dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+    color: var(--color-link-hover) !important;
+    border-color: var(--color-border) !important;
+    background: var(--color-surface-elevated) !important
+}
+
+div.dataTables_paginate .paginate_button.current,
+div.dataTables_paginate .paginate_button.current:hover,
+div.dataTables_wrapper .dataTables_paginate .paginate_button.current,
+div.dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+    color: var(--color-on-brand-yellow) !important;
+    border-color: var(--color-brand-yellow) !important;
+    background: var(--color-brand-yellow) !important
+}
+
+div.dataTables_paginate .paginate_button.disabled,
+div.dataTables_paginate .paginate_button.disabled:hover,
+div.dataTables_paginate .paginate_button.disabled:active,
+div.dataTables_wrapper .dataTables_paginate .paginate_button.disabled,
+div.dataTables_wrapper .dataTables_paginate .paginate_button.disabled:hover,
+div.dataTables_wrapper .dataTables_paginate .paginate_button.disabled:active {
+    color: var(--color-text-muted) !important;
+    border-color: transparent !important;
+    background: transparent !important;
+    opacity: .55
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body,
+    div.fw-container,
+    div.fw-container div.fw-body,
+    div.fw-container div.fw-body div.content,
+    .page_menu,
+    table.dataTable,
+    table.dataTable th,
+    table.dataTable td,
+    select,
+    input,
+    textarea,
+    button[data-theme-toggle] {
+        transition: none
+    }
+}
+/* === End Gibloux Volley semantic theme system === */

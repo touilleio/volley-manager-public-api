@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -70,14 +72,47 @@ func TestRefreshPipeline_never_exposes_unmanaged_games(t *testing.T) {
 	for range 200 {
 		// Then only managed games are ever visible (run with -race)
 		response := httptest.NewRecorder()
-		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/upcoming", nil))
+		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/upcoming", nil))
 		assert.NotContains(t, response.Body.String(), "Unmanaged")
 		response = httptest.NewRecorder()
-		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/past", nil))
+		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/past", nil))
 		assert.NotContains(t, response.Body.String(), "Unmanaged")
 	}
 	cancel()
 	refreshes.Wait()
+}
+
+func TestUpcomingGames_include_game_id_in_response(t *testing.T) {
+	// Given the production router with one future game in state
+	gin.SetMode(gin.TestMode)
+	s := newState("", nil, nil)
+	s.rawGames = []Game{{
+		GameId:   42,
+		PlayDate: "2099-01-01 12:00:00",
+		Teams: struct {
+			Home Team `json:"home"`
+			Away Team `json:"away"`
+		}{
+			Home: Team{TeamId: 1, Caption: "Home", ClubId: "home"},
+			Away: Team{TeamId: 2, Caption: "Away", ClubId: "away"},
+		},
+		League: League{Caption: "League"},
+		Hall:   Hall{Caption: "Hall", City: "City"},
+	}}
+	router := newApi(s, nil).router()
+
+	// When the public upcoming endpoint is called
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/upcoming", nil))
+
+	// Then the public payload exposes the source game id
+	require.Equal(t, http.StatusOK, response.Code)
+	var games []struct {
+		GameID int `json:"gameId"`
+	}
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &games))
+	require.Len(t, games, 1)
+	assert.Equal(t, 42, games[0].GameID)
 }
 
 func TestMCPHandler_is_stateless(t *testing.T) {
@@ -108,7 +143,7 @@ func TestTeamEndpoints_reject_invalid_id_without_internal_details(t *testing.T) 
 	s := newState("", nil, nil)
 	router := newApi(s, nil).router()
 
-	for _, path := range []string{"/upcoming/abc", "/past/abc", "/ranking/abc", "/ics/upcoming/abc"} {
+	for _, path := range []string{"/api/upcoming/abc", "/api/past/abc", "/api/ranking/abc", "/ics/upcoming/abc"} {
 		// When the team id is not numeric
 		response := httptest.NewRecorder()
 		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
@@ -153,6 +188,43 @@ func TestRouter_sets_security_headers(t *testing.T) {
 	// Then baseline anti-MIME-sniffing and referrer headers are present
 	assert.Equal(t, "nosniff", response.Header().Get("X-Content-Type-Options"))
 	assert.Equal(t, "strict-origin-when-cross-origin", response.Header().Get("Referrer-Policy"))
+}
+
+func TestRouter_root_redirects_permanently_to_upcoming_page(t *testing.T) {
+	// Given the production router
+	gin.SetMode(gin.TestMode)
+	s := newState("", nil, nil)
+	router := newApi(s, nil).router()
+
+	// When the root page is requested
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
+
+	// Then browsers land directly on the upcoming matches page
+	assert.Equal(t, http.StatusMovedPermanently, response.Code)
+	assert.Equal(t, "/static/upcoming.html", response.Header().Get("Location"))
+}
+
+func TestStaticPages_reference_svg_favicon(t *testing.T) {
+	for _, page := range []string{"static/upcoming.html", "static/past.html", "static/ranking.html"} {
+		contents, err := os.ReadFile(page)
+		require.NoError(t, err, page)
+		assert.Contains(t, string(contents), `<link rel="icon" type="image/svg+xml" href="img/favicon.svg">`, page)
+	}
+
+	_, err := os.Stat("static/index.html")
+	assert.True(t, os.IsNotExist(err), "static/index.html should be removed")
+}
+
+func TestFavicon_uses_only_yellow_volleyball_geometry(t *testing.T) {
+	contents, err := os.ReadFile("static/img/favicon.svg")
+	require.NoError(t, err)
+	favicon := string(contents)
+
+	assert.Contains(t, favicon, `viewBox="117.62 101.38 60.63 60.63"`)
+	assert.Contains(t, favicon, `fill="#FDC500"`)
+	assert.NotContains(t, favicon, `#417BA6`)
+	assert.NotContains(t, favicon, `logo_giblouxvolley.svg`)
 }
 
 func TestRouter_static_assets_require_revalidation(t *testing.T) {
