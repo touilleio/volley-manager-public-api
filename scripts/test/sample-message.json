@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "type": "volley.matches.changed",
+  "detectedAt": "2026-07-31T16:00:00+02:00",
+  "games": [
+    {
+      "gameId": 391647,
+      "playDate": "2026-08-06 20:15:00",
+      "homeTeam": "Gibloux Volley F1",
+      "awayTeam": "Volley Fribourg",
+      "league": "2L",
+      "hall": "Gymnase, Bulle",
+      "changes": [
+        { "field": "playDate", "old": "2026-08-05 18:30:00", "new": "2026-08-06 20:15:00" },
+        { "field": "hall", "old": "Salle du Collège, Fribourg", "new": "Gymnase, Bulle" }
+      ]
+    },
+    {
+      "gameId": 391655,
+      "playDate": "2026-08-08 17:00:00",
+      "homeTeam": "Gibloux Volley F4",
+      "awayTeam": "VBC Schönried",
+      "league": "3L",
+      "hall": "Centre sportif, Châtel",
+      "changes": [
+        { "field": "homeTeam", "old": "VBC Schönried", "new": "Gibloux Volley F4" },
+        { "field": "status", "old": "2", "new": "5" }
+      ]
+    }
+  ]
+}

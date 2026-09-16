@@ -110,6 +110,7 @@ $( document ).ready(function() {
 			oTable.ajax.url('/api/past/' + value).load();
             oTable.draw();
 		});
+		bindTeamLinks();
 	});
 	  
 });
