@@ -28,8 +28,8 @@ $( document ).ready(function() {
 		}
 		// Filter results on select change
 		$('#sel_team_id').on('change', function () {
-			caption = $(this).find(":selected").text()
-			value = $(this).find(":selected").val()
+			var caption = $(this).find(":selected").text()
+			var value = $(this).find(":selected").val()
 			if(!caption.includes("Choisis")){
 				
 				if(oTable != null){
@@ -110,8 +110,13 @@ $( document ).ready(function() {
 				
 				
 				
+			} else if (oTable != null) {
+				oTable.destroy();
+				oTable = null;
+				$('#table-container').removeClass('demo-html-visible');
 			}
 		});
+		bindTeamLinks();
 	});
 	  
 });

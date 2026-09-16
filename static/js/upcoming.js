@@ -102,6 +102,7 @@ $( document ).ready(function() {
 			oTable.ajax.url('/api/upcoming/' + value).load();
             oTable.draw();
 		});
+		bindTeamLinks();
 	});
 	  
 });
