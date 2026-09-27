@@ -10,6 +10,7 @@
 #   WACLI_BIN    Path to wacli (default: ~/go/bin/wacli)
 #   WACLI_ACCOUNT  Named wacli account (default: wacli's default account)
 #   AWS_BIN      Path to aws cli (default: aws)
+#   SLACK_WEBHOOK_URL  Slack incoming webhook notified on SQS or wacli failures
 #
 # Modes:
 #   (none)              poll forever (SQS long polling, 20s)
@@ -23,6 +24,7 @@ QUEUE_URL="${QUEUE_URL:-}"
 WACLI_TO="${WACLI_TO:-}"
 WACLI_BIN="${WACLI_BIN:-$HOME/go/bin/wacli}"
 WACLI_ACCOUNT="${WACLI_ACCOUNT:-}"
+SLACK_WEBHOOK_URL="${SLACK_WEBHOOK_URL:-}"
 WAIT_TIME_SECONDS=20
 MAX_MESSAGES=10
 
@@ -31,6 +33,14 @@ log() { printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >&2; }
 die() { log "ERROR: $*"; exit 1; }
 
 need_cmd() { command -v "$1" >/dev/null 2>&1 || die "missing dependency: $1"; }
+
+notify_slack() {
+	[ -z "$SLACK_WEBHOOK_URL" ] && return
+	local payload
+	payload="$(jq -nc --arg text "sqs-whatsapp-notifier: $*" '{text: $text}')"
+	curl -fsS --max-time 10 -H 'Content-Type: application/json' --data "$payload" "$SLACK_WEBHOOK_URL" >/dev/null ||
+		log "Slack notification failed"
+}
 
 format_date() {
 	TZ=Europe/Zurich LC_TIME=fr_FR.UTF-8 date -d "$1" '+%a %d.%m.%Y %Hh%M' 2>/dev/null || printf '%s' "$1"
@@ -112,6 +122,7 @@ while [ $# -gt 0 ]; do
 done
 
 need_cmd jq
+[ -z "$SLACK_WEBHOOK_URL" ] || need_cmd curl
 
 if [ -n "$FIXTURE" ]; then
 	[ -r "$FIXTURE" ] || die "cannot read fixture: $FIXTURE"
@@ -140,6 +151,7 @@ while true; do
 
 	if ! response="$("$AWS_BIN" "${aws_args[@]}")"; then
 		log "receive-message failed; retrying in 30s"
+		notify_slack "SQS receive-message failed; retrying in 30s"
 		sleep 30
 		continue
 	fi
@@ -150,6 +162,7 @@ while true; do
 	if ! message_count="$(jq -r '(.Messages // []) | length' <<<"$response" 2>/dev/null)" ||
 		! [[ "$message_count" =~ ^[0-9]+$ ]]; then
 		log "unexpected receive-message output; first bytes: [$(printf '%s' "$response" | head -c 300)]; retrying in 30s"
+		notify_slack "SQS returned unexpected receive-message output; retrying in 30s"
 		sleep 30
 		continue
 	fi
@@ -172,6 +185,7 @@ while true; do
 			[ -z "$message" ] && continue
 			if ! send_whatsapp "$message"; then
 				log "wacli send failed; message kept in queue"
+				notify_slack "wacli send failed; message kept in queue"
 				send_failed=1
 			fi
 		done < <(format_messages "$body")
@@ -180,7 +194,10 @@ while true; do
 			delete_args=(sqs delete-message --profile "$AWS_PROFILE" --queue-url "$QUEUE_URL"
 				--receipt-handle "$receipt_handle")
 			[ -n "${AWS_REGION:-}" ] && delete_args+=(--region "$AWS_REGION")
-			"$AWS_BIN" "${delete_args[@]}" >/dev/null || log "delete-message failed; message may be redelivered"
+			if ! "$AWS_BIN" "${delete_args[@]}" >/dev/null; then
+				log "delete-message failed; message may be redelivered"
+				notify_slack "SQS delete-message failed; message may be redelivered"
+			fi
 		fi
 	done
 done
