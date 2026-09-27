@@ -77,7 +77,7 @@ func (s *state) addManagedTeam(managed *managedGames, game Game, team Team) bool
 
 	if league, exists := managed.leaguePerTeam[team.TeamId]; exists {
 		if league.LeagueId != game.League.LeagueId {
-			slog.Warn("League mismatch for team", "team", team.Caption, "previous", league.Caption, "current", game.League.Caption)
+			slog.Warn("League mismatch for team", "team", team.Caption, "previous", league.Caption, "current", game.League.Caption, "catId", game.League.LeagueCategoryId)
 		}
 	} else {
 		managed.leaguePerTeam[team.TeamId] = game.League
