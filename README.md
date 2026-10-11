@@ -85,6 +85,28 @@ publisher credentials (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`, optionally
 your `.env` file. `PUBLISH_NEW_GAMES` defaults to `false`. When `SNS_TOPIC_ARN` is unset,
 notifications are disabled.
 
+Failed SNS events are kept in the games snapshot and retried on later polls, including after a
+restart. Each event has a stable `eventId` and contains one game. The snapshot atomically records
+the latest games and pending events before publishing. Keep `STATE_SNAPSHOT_PATH` on persistent
+storage; an empty path limits recovery to the running process. Legacy games-array snapshots are
+read automatically, but new snapshots use a versioned object that older binaries cannot read.
+A corrupt snapshot now stops startup instead of silently discarding pending notifications.
+
+Set `SLACK_WEBHOOK_URL` to an incoming webhook to enable operational alerts. The application sends
+one alert after **11 consecutive upstream fetch failures**, including the last error. A successful
+fetch resets the counter so a later outage can alert again. Failed Slack delivery is attempted again
+on a later failed poll. Startup, snapshot-write and SNS-publish failures also send alerts. Slack
+requests have a 10-second deadline; Slack failures are logged and do not stop polling. Leaving the
+webhook unset disables Slack alerts independently of SNS match notifications.
+
+The WhatsApp consumer also accepts `SLACK_WEBHOOK_URL` for receive, validation, send and delete
+failures. It keeps invalid events in SQS so the queue's dead-letter policy can handle them. Its
+`STATE_DIR` (default `~/.local/state/sqs-whatsapp-notifier`) stores per-game delivery receipts;
+keep that directory persistent to skip successfully sent games on redelivery and after restart.
+Older events without `eventId` use SQS `MessageId` for redelivery detection. A crash after WhatsApp
+accepts a send but before its receipt is saved can still produce a duplicate; delivery is not
+exactly-once. Keep receipts for as long as old events may be replayed.
+
 The Terraform setup in [deployment/](./deployment) creates the topic and one subscribed SQS queue
 per suffix. Its default suffixes are `generic-wacli` and `marqueurs`. Get the queue URLs with
 `terraform output -json queue_urls`; for example, use
@@ -98,6 +120,7 @@ The payload is formatting-independent; consumers own the rendering (Telegram mes
 ```json
 {
   "version": 1,
+  "eventId": "stable-id-for-this-event",
   "type": "volley.matches.changed",
   "detectedAt": "2026-07-24T16:00:00+02:00",
   "games": [
@@ -122,6 +145,7 @@ New-match events have the same envelope and match metadata, without a `changes` 
 ```json
 {
   "version": 1,
+  "eventId": "stable-id-for-this-new-event",
   "type": "volley.matches.new",
   "detectedAt": "2026-07-24T16:00:00+02:00",
   "games": [

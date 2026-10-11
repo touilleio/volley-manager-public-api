@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -38,9 +39,18 @@ type EnvConfig struct {
 	PublishNewGames        bool          `envconfig:"PUBLISH_NEW_GAMES" default:"false"`
 	AwsRegion              string        `envconfig:"AWS_REGION" default:"eu-central-1"`
 	StateSnapshotPath      string        `envconfig:"STATE_SNAPSHOT_PATH" default:"/data/games-snapshot.json"`
+	SlackWebhookURL        string        `envconfig:"SLACK_WEBHOOK_URL" default:""`
 }
 
 func main() {
+	if err := run(); err != nil && !errors.Is(err, context.Canceled) {
+		slog.Error("Application failed", "err", err)
+		newSlackNotifier(os.Getenv("SLACK_WEBHOOK_URL")).alert(context.Background(), "Application failed: "+err.Error())
+		os.Exit(1)
+	}
+}
+
+func run() error {
 
 	var logLevel = new(slog.LevelVar)
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})))
@@ -54,8 +64,10 @@ func main() {
 
 	var env EnvConfig
 	if err := envconfig.Process("", &env); err != nil {
-		slog.Error("Failed to process env var", "err", err)
-		return
+		return fmt.Errorf("processing environment: %w", err)
+	}
+	if env.RefreshInterval <= 0 {
+		return errors.New("REFRESH_INTERVAL must be greater than zero")
 	}
 
 	flag.Parse()
@@ -67,11 +79,9 @@ func main() {
 	}
 
 	// errgroup will coordinate the many routines handling the API.
-	cancellableCtx, cancel := context.WithCancel(context.Background())
+	cancellableCtx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
 	g, ctx := errgroup.WithContext(cancellableCtx)
-	// signalChan will catch the shutdown signal and initiate a clean shutdown
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 
 	// The state where information are stored
 	theState := newState(env.ClubID, env.ExcludedTeamIDs, env.CupLeagueCategoryIDs)
@@ -80,8 +90,7 @@ func main() {
 	if env.SnsTopicARN != "" {
 		p, err := newSnsPublisher(cancellableCtx, env.SnsTopicARN, env.AwsRegion)
 		if err != nil {
-			slog.Error("Got an error while instantiating the SNS publisher", "err", err)
-			return
+			return fmt.Errorf("instantiating SNS publisher: %w", err)
 		}
 		publisher = p
 	} else {
@@ -90,13 +99,13 @@ func main() {
 
 	// The change detector is primed with the snapshot of the previous run, so
 	// that matches moved while the application was down are caught on the
-	// first poll after a restart. A missing or corrupt snapshot simply means
-	// the first poll establishes a fresh baseline without notifying.
-	previousGames, err := loadSnapshot(env.StateSnapshotPath)
+	// first poll after a restart. A missing snapshot establishes a fresh baseline;
+	// a corrupt snapshot stops startup so pending notifications are not discarded.
+	snapshot, err := loadPollSnapshot(env.StateSnapshotPath)
 	if err != nil {
-		slog.Warn("Could not load games snapshot, starting with a fresh baseline", "path", env.StateSnapshotPath, "err", err)
+		return fmt.Errorf("loading games snapshot: %w", err)
 	}
-	detector := newChangeDetector(previousGames)
+	detector := newChangeDetector(snapshot.Games)
 
 	// The fetcher will poll the Volley Manager API at a given rate
 	theFetcher := newFetcher(env.APIKey)
@@ -107,12 +116,13 @@ func main() {
 		publisher:       publisher,
 		publishNewGames: env.PublishNewGames,
 		snapshotPath:    env.StateSnapshotPath,
+		pending:         snapshot.Pending,
+		slack:           newSlackNotifier(env.SlackWebhookURL),
 	}
 
 	// First fetch must complete
 	if err := poller.run(cancellableCtx); err != nil {
-		slog.Error("Got an error while fetching the data for the first time", "err", err)
-		return
+		return fmt.Errorf("initial poll: %w", err)
 	}
 
 	// Fetch loop
@@ -136,20 +146,15 @@ func main() {
 	theApi.run(fmt.Sprintf("%s:%s", env.BindIP, env.Port), ctx, g)
 
 	// Wait for any shutdown
-	select {
-	case <-signalChan:
-		slog.Info("Shutdown signal received, exiting...")
-		cancel()
-	case <-ctx.Done():
-		slog.Info("Group context is done, exiting...")
-		cancel()
-	}
+	<-ctx.Done()
+	slog.Info("Shutdown requested, exiting...")
+	cancel()
 
 	// if a non-clean shutdown was triggered, details are printed here
 	if err := g.Wait(); err != nil && !errors.Is(err, context.Canceled) {
-		slog.Error("Got an error from the error group", "err", err)
-		os.Exit(1)
+		return err
 	}
+	return nil
 }
 
 type poller struct {
@@ -159,40 +164,92 @@ type poller struct {
 	publisher       *snsPublisher
 	publishNewGames bool
 	snapshotPath    string
+	pending         []json.RawMessage
+	slack           *slackNotifier
+	fetchFailures   int
+	fetchAlerted    bool
 }
 
 func (p *poller) run(ctx context.Context) error {
 	games, rankings, err := p.fetcher.fetch(ctx)
 	if err != nil {
+		if ctx.Err() == nil {
+			p.fetchFailures++
+			if p.fetchFailures > 10 && !p.fetchAlerted {
+				if alertErr := p.slack.send(ctx, fmt.Sprintf("Upstream fetch failed %d consecutive times. Last error: %s", p.fetchFailures, err)); alertErr != nil {
+					slog.Warn("Could not send Slack fetch failure notification", "err", alertErr)
+				} else {
+					p.fetchAlerted = true
+				}
+			}
+			p.deliverPending(ctx)
+		}
 		return err
 	}
+	p.fetchFailures = 0
+	p.fetchAlerted = false
 
 	allGames := p.state.rebuildManagedGames(games, rankings)
 
 	slog.Info("Pulled", "games", len(p.state.rawGames), "teams", len(p.state.teams))
 
-	diff := p.detector.diff(allGames, time.Now())
-	if len(diff.Changes) > 0 {
-		slog.Info("Detected changed game(s)", "count", len(diff.Changes))
-		if p.publisher != nil {
-			if err := p.publisher.publishChanges(ctx, diff.Changes); err != nil {
-				slog.Warn("Error publishing change notification", "err", err)
+	previousDetector := *p.detector
+	now := time.Now()
+	diff := p.detector.diff(allGames, now)
+	pending := append([]json.RawMessage(nil), p.pending...)
+	if p.publisher != nil {
+		// One event per game avoids replaying an entire batch after partial delivery.
+		for _, change := range diff.Changes {
+			payload, err := pendingNotification(newChangeNotification([]GameChange{change}, now))
+			if err != nil {
+				*p.detector = previousDetector
+				return err
+			}
+			pending = append(pending, payload)
+		}
+		if p.publishNewGames {
+			for _, game := range diff.NewGames {
+				payload, err := pendingNotification(newNewGamesNotification([]Game{game}, now))
+				if err != nil {
+					*p.detector = previousDetector
+					return err
+				}
+				pending = append(pending, payload)
 			}
 		}
 	}
-	if p.publishNewGames && len(diff.NewGames) > 0 {
-		slog.Info("Detected new game(s)", "count", len(diff.NewGames))
-		if p.publisher != nil {
-			if err := p.publisher.publishNewGames(ctx, diff.NewGames); err != nil {
-				slog.Warn("Error publishing new games notification", "err", err)
-			}
-		}
+	// Commit the baseline and pending events together before attempting SNS.
+	if err := savePollSnapshot(p.snapshotPath, pollSnapshot{Games: allGames, Pending: pending}); err != nil {
+		*p.detector = previousDetector
+		p.slack.alert(ctx, "Could not save games and pending notifications: "+err.Error())
+		return err
 	}
-	if err := saveSnapshot(p.snapshotPath, allGames); err != nil {
-		slog.Warn("Error saving games snapshot", "err", err)
-	}
+	p.pending = pending
+	p.deliverPending(ctx)
 
 	return nil
+}
+
+func (p *poller) deliverPending(ctx context.Context) {
+	if p.publisher == nil {
+		return
+	}
+	for len(p.pending) > 0 {
+		if err := p.publisher.publish(ctx, p.pending[0], "pending match"); err != nil {
+			slog.Warn("Error publishing notification; retained for retry", "err", err)
+			if ctx.Err() == nil {
+				p.slack.alert(ctx, "SNS publish failed; notification retained for retry: "+err.Error())
+			}
+			return
+		}
+		remaining := p.pending[1:]
+		if err := savePollSnapshot(p.snapshotPath, pollSnapshot{Games: p.detector.previous, Pending: remaining}); err != nil {
+			slog.Warn("Could not acknowledge published notification; retained for retry", "err", err)
+			p.slack.alert(ctx, "Could not acknowledge published notification: "+err.Error())
+			return
+		}
+		p.pending = remaining
+	}
 }
 
 // parseLogLevel also accepts the previous logger's level names (trace/fatal/panic).

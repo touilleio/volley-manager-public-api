@@ -11,12 +11,14 @@
 #   WACLI_ACCOUNT  Named wacli account (default: wacli's default account)
 #   AWS_BIN      Path to aws cli (default: aws)
 #   SLACK_WEBHOOK_URL  Slack incoming webhook notified on SQS or wacli failures
+#   STATE_DIR    Persistent delivery receipts (default: ~/.local/state/sqs-whatsapp-notifier)
 #
 # Modes:
 #   (none)              poll forever (SQS long polling, 20s)
 #   --dry-run           poll and print messages without sending or deleting
 #   --fixture FILE      render the SQS message body in FILE and exit (testing)
 set -euo pipefail
+umask 077
 
 AWS_PROFILE="${AWS_PROFILE:-default}"
 AWS_BIN="${AWS_BIN:-aws}"
@@ -25,6 +27,7 @@ WACLI_TO="${WACLI_TO:-}"
 WACLI_BIN="${WACLI_BIN:-$HOME/go/bin/wacli}"
 WACLI_ACCOUNT="${WACLI_ACCOUNT:-}"
 SLACK_WEBHOOK_URL="${SLACK_WEBHOOK_URL:-}"
+STATE_DIR="${STATE_DIR:-$HOME/.local/state/sqs-whatsapp-notifier}"
 WAIT_TIME_SECONDS=20
 MAX_MESSAGES=10
 
@@ -62,6 +65,23 @@ change_line() {
 # a form-feed character so the caller can split without losing newlines.
 format_messages() {
 	local body="$1"
+	# Validate before rendering: command/process substitutions hide failures from
+	# the caller, and no malformed or unsupported event may be acknowledged.
+	jq -e '
+		.version == 1 and
+		(.type == "volley.matches.changed" or .type == "volley.matches.new") and
+		((has("eventId") | not) or (.eventId | type == "string" and length > 0)) and
+		(.games | type == "array" and length > 0) and
+		([.games[].gameId] | length == (unique | length)) and
+		all(.games[];
+			(.gameId | type == "number" and . > 0 and floor == .) and
+			all(.playDate, .homeTeam, .awayTeam, .league, .hall; type == "string") and
+			([.. | strings] | all(index("\u000c") == null))) and
+		(if .type == "volley.matches.changed" then
+			all(.games[]; (.changes | type == "array" and length > 0) and
+				all(.changes[]; all(.field, .old, .new; type == "string")))
+		else true end)
+	' <<<"$body" >/dev/null || return 1
 	case "$(jq -r '.type // ""' <<<"$body")" in
 	volley.matches.changed)
 		jq -c '.games[]' <<<"$body" | while IFS= read -r game; do
@@ -132,10 +152,13 @@ if [ -n "$FIXTURE" ]; then
 	exit 0
 fi
 
-[ -x "$AWS_BIN" ] || die "aws cli not found or not executable: $AWS_BIN"
-[ -x "$WACLI_BIN" ] || die "wacli not found or not executable: $WACLI_BIN"
+need_cmd "$AWS_BIN"
+need_cmd "$WACLI_BIN"
+need_cmd sha256sum
+need_cmd flock
 [ -n "$QUEUE_URL" ] || die "QUEUE_URL is not set"
 [ -n "$WACLI_TO" ] || die "WACLI_TO is not set"
+mkdir -p "$STATE_DIR" || die "cannot create delivery state directory"
 
 # Single instance: a second run exits instead of duplicating notifications.
 exec 9>"${TMPDIR:-/tmp}/sqs-whatsapp-notifier.lock"
@@ -172,23 +195,45 @@ while true; do
 	jq -c '.Messages[]' <<<"$response" | while IFS= read -r sqs_message; do
 		body="$(jq -r '.Body' <<<"$sqs_message")"
 		receipt_handle="$(jq -r '.ReceiptHandle' <<<"$sqs_message")"
-
-		if [ "$DRY_RUN" -eq 1 ]; then
-			format_messages "$body" | while IFS= read -r -d $'\f' message; do
-				[ -n "$message" ] && printf '%s\n---\n' "$message"
-			done
+		if ! rendered="$(format_messages "$body")" || [ -z "$rendered" ]; then
+			log "invalid notification; message kept in queue"
+			notify_slack "Invalid notification; message kept in queue for dead-letter handling"
 			continue
 		fi
 
+		if [ "$DRY_RUN" -eq 1 ]; then
+			while IFS= read -r -d $'\f' message; do
+				[ -n "$message" ] && printf '%s\n---\n' "$message"
+			done <<<"$rendered"
+			continue
+		fi
+		event_id="$(jq -r '.eventId // empty' <<<"$body")"
+		[ -n "$event_id" ] || event_id="$(jq -r '.MessageId // empty' <<<"$sqs_message")"
+		if [ -z "$event_id" ]; then
+			log "notification has no eventId or SQS MessageId; message kept in queue"
+			notify_slack "Notification has no delivery identifier; message kept in queue"
+			continue
+		fi
+		mapfile -t game_ids < <(jq -r '.games[].gameId' <<<"$body")
+
 		send_failed=0
+		game_index=0
 		while IFS= read -r -d $'\f' message; do
 			[ -z "$message" ] && continue
+			delivery_id="$(printf '%s\n' "$QUEUE_URL" "$WACLI_ACCOUNT" "$WACLI_TO" "$event_id" "${game_ids[$game_index]}" | sha256sum)"
+			delivery_file="$STATE_DIR/${delivery_id%% *}"
+			game_index=$((game_index + 1))
+			[ -f "$delivery_file" ] && continue
 			if ! send_whatsapp "$message"; then
 				log "wacli send failed; message kept in queue"
 				notify_slack "wacli send failed; message kept in queue"
 				send_failed=1
+			elif ! touch "$delivery_file"; then
+				log "cannot persist delivery receipt; message kept in queue"
+				notify_slack "Cannot persist delivery receipt; message may be delivered again"
+				send_failed=1
 			fi
-		done < <(format_messages "$body")
+		done <<<"$rendered"
 
 		if [ "$send_failed" -eq 0 ]; then
 			delete_args=(sqs delete-message --profile "$AWS_PROFILE" --queue-url "$QUEUE_URL"

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -128,6 +129,8 @@ func (p *snsPublisher) publishNewGames(ctx context.Context, games []Game) error 
 }
 
 func (p *snsPublisher) publish(ctx context.Context, payload []byte, name string) error {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
 	message := string(payload)
 	_, err := p.client.Publish(ctx, &sns.PublishInput{
 		TopicArn: &p.topicArn,
@@ -137,4 +140,22 @@ func (p *snsPublisher) publish(ctx context.Context, payload []byte, name string)
 		return fmt.Errorf("publishing %s notification to SNS: %w", name, err)
 	}
 	return nil
+}
+
+// Freeze the event's timestamp and ID before persistence so retries can be
+// recognized by consumers, including after an ambiguous SNS response.
+func pendingNotification(notification any) (json.RawMessage, error) {
+	payload, err := json.Marshal(notification)
+	if err != nil {
+		return nil, err
+	}
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &envelope); err != nil {
+		return nil, err
+	}
+	envelope["eventId"], err = json.Marshal(fmt.Sprintf("%x", sha256.Sum256(payload)))
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(envelope)
 }

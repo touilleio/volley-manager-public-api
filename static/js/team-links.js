@@ -1,3 +1,13 @@
+function populateTeamOptions(teams, placeholder) {
+	var select = document.getElementById('sel_team_id');
+	select.appendChild(new Option(placeholder, ''));
+	Object.entries(teams).sort(function(a, b) {
+		return a[1].localeCompare(b[1]);
+	}).forEach(function(team) {
+		select.appendChild(new Option(team[1], team[0]));
+	});
+}
+
 function bindTeamLinks() {
 	var select = document.getElementById('sel_team_id');
 	var applyingHash = false;

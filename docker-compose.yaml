@@ -12,6 +12,7 @@ services:
       - CUP_LEAGUE_CATEGORY_IDS
       - SNS_TOPIC_ARN
       - PUBLISH_NEW_GAMES
+      - SLACK_WEBHOOK_URL
       - AWS_REGION
       - AWS_ACCESS_KEY_ID
       - AWS_SECRET_ACCESS_KEY
