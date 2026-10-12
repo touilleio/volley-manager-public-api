@@ -25,6 +25,7 @@ https://api.volleyball.ch/indoor/recentResults
 
 const gamesCollectionUri = "https://api.volleyball.ch/indoor/games?includeCup=1"
 const clubRankingsUri = "https://api.volleyball.ch/indoor/ranking"
+const maxCollectionBytes = 32 << 20
 
 type fetcher struct {
 	apiKey string
@@ -56,14 +57,17 @@ func (f fetcher) fetch(ctx context.Context) ([]Game, []GroupRankings, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := readCollection(resp)
 	if err != nil {
 		return nil, nil, fmt.Errorf("reading games response body: %w", err)
 	}
 
 	var games []Game
 	if err := json.Unmarshal(body, &games); err != nil {
-		return nil, nil, fmt.Errorf("unmarshalling games response: %w (body: %.512s)", err, string(body))
+		return nil, nil, fmt.Errorf("unmarshalling games response: %w", err)
+	}
+	if games == nil {
+		return nil, nil, fmt.Errorf("games response must be an array")
 	}
 
 	// Fetch the rawRankings
@@ -79,15 +83,32 @@ func (f fetcher) fetch(ctx context.Context) ([]Game, []GroupRankings, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err = io.ReadAll(resp.Body)
+	body, err = readCollection(resp)
 	if err != nil {
 		return nil, nil, fmt.Errorf("reading rankings response body: %w", err)
 	}
 
 	var rankings []GroupRankings
 	if err := json.Unmarshal(body, &rankings); err != nil {
-		return nil, nil, fmt.Errorf("unmarshalling rankings response: %w (body: %.512s)", err, string(body))
+		return nil, nil, fmt.Errorf("unmarshalling rankings response: %w", err)
+	}
+	if rankings == nil {
+		return nil, nil, fmt.Errorf("rankings response must be an array")
 	}
 
 	return games, rankings, nil
+}
+
+func readCollection(resp *http.Response) ([]byte, error) {
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("upstream returned HTTP %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxCollectionBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(body) > maxCollectionBytes {
+		return nil, fmt.Errorf("upstream collection exceeds %d bytes", maxCollectionBytes)
+	}
+	return body, nil
 }

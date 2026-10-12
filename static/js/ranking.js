@@ -8,24 +8,12 @@ $( document ).ready(function() {
 		}
     });
 	
-	teams = []
-	
 	$.getJSON("/api/teams", function(result){
-		$.each(result, function(i, field){
-			teams.push(field + ":" + i)
-		});
-		
-		teams.sort();
-		teams.unshift("Choisis une équipe...")
-		
 		// select filter
 		$('#team-filter').append('<label>&nbsp; Equipe:</label>');
 		$('#team-filter').append('<select class="form-control input-sm"  id="sel_team_id"></select>');
 		
-		for (var ele in teams) {
-			var obj = teams[ele].split(":");
-			$('#sel_team_id').append('<option value="' + obj[1] + '">' + obj[0] + '</option>');
-		}
+		populateTeamOptions(result, 'Choisis une équipe...');
 		// Filter results on select change
 		$('#sel_team_id').on('change', function () {
 			var caption = $(this).find(":selected").text()
@@ -67,7 +55,8 @@ $( document ).ready(function() {
 						{
 							data: 'rank'
 						},{
-							data: 'teamCaption'
+							data: 'teamCaption',
+							render: DataTable.render.text()
 						},{
 							data: 'games'
 						},{

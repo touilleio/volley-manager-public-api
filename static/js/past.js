@@ -9,8 +9,11 @@ function escapeHtml(value) {
 }
 
 function renderLeagueCell(data, type, row) {
-	if (type !== 'display' || !row || row.isCup !== true) {
+	if (type !== 'display') {
 		return data;
+	}
+	if (!row || row.isCup !== true) {
+		return escapeHtml(data);
 	}
 
 	return '<span class="league-cell"><span class="league-cell-text">' + escapeHtml(data) + '</span><span class="league-cup-indicator"><span data-feather="award" class="league-cup-icon" aria-hidden="true"></span><span class="league-cup-label">Coupe</span></span></span>';
@@ -30,24 +33,12 @@ $( document ).ready(function() {
 		}
     });
 	
-	teams = []
-	
 	$.getJSON("/api/teams", function(result){
-		$.each(result, function(i, field){
-			teams.push(field + ":" + i)
-		});
-		
-		teams.sort();
-		teams.unshift("Toutes:")
-		
 		// select filter
 		$('#team-filter').append('<label>&nbsp; Equipe:</label>');
 		$('#team-filter').append('<select class="form-control input-sm"  id="sel_team_id"></select>');
 		
-		for (var ele in teams) {
-			var obj = teams[ele].split(":");
-			$('#sel_team_id').append('<option value="' + obj[1] + '">' + obj[0] + '</option>');
-		}
+		populateTeamOptions(result, 'Toutes');
 		
 		//console.log( "ready!" );
 		oTable = new DataTable('#pastmatches', {
@@ -71,14 +62,17 @@ $( document ).ready(function() {
 						return capitalizeFirstLetter(moment(data, "YYYY-MM-DD HH:mm:ss").format("dddd DD.MM.YYYY HH:mm"))
 					}
 				},{
-					data: 'homeTeam'
+					data: 'homeTeam',
+					render: DataTable.render.text()
 				},{
-					data: 'awayTeam'
+					data: 'awayTeam',
+					render: DataTable.render.text()
 				},{
 					data: 'phase',
 					render: renderLeagueCell
 				},{
-					data: 'hall'
+					data: 'hall',
+					render: DataTable.render.text()
 				},{
 					data: 'wonSetsHomeTeam',
 					render: function(data, param, row) {
@@ -88,9 +82,9 @@ $( document ).ready(function() {
 					data: 'winner',
 					render: function(data, param, row) {
 						if(data == 'team_away'){
-							return row.awayTeam
+							return param === 'display' ? escapeHtml(row.awayTeam) : row.awayTeam
 						}else if(data == 'team_home'){
-							return row.homeTeam
+							return param === 'display' ? escapeHtml(row.homeTeam) : row.homeTeam
 						}else{
 							return "à Communiquer"
 						}
