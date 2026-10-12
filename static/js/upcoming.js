@@ -88,7 +88,12 @@ $( document ).ready(function() {
 			value = $(this).find(":selected").val()
 			$('#ics_export').remove()
 			if(caption != 'Toutes'){
-				$('#team-filter').append($('<a>', {id: 'ics_export', href: '/ics/upcoming/' + value, target: '_blank', text: 'Exporter calendrier'}));
+				var calendarLink = document.createElement('a');
+				calendarLink.id = 'ics_export';
+				calendarLink.href = '/ics/upcoming/' + encodeURIComponent(value);
+				calendarLink.target = '_blank';
+				calendarLink.textContent = 'Exporter calendrier';
+				document.getElementById('team-filter').appendChild(calendarLink);
 			}
 			oTable.ajax.url('/api/upcoming/' + value).load();
             oTable.draw();
